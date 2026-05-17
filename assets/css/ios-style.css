@@ -213,11 +213,11 @@ hr {
 }
 
 .post-capsule.active {
-  background: rgba(128, 128, 128, 0.2);   /* 灰色半透明底 */
-  backdrop-filter: blur(10px);             /* 毛玻璃模糊 */
+  background: rgba(120, 120, 128, 0.12);       /* iOS 风格的暖灰 */
+  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-color: rgba(128, 128, 128, 0.25);
-  box-shadow: 0 0 0 1px rgba(128, 128, 128, 0.15);
+  border-color: rgba(120, 120, 128, 0.2);
+  box-shadow: 0 0 0 1px rgba(120, 120, 128, 0.08);
 }
 
 .capsule-title {
