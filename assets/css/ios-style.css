@@ -234,3 +234,29 @@ hr {
 .pageviews {
   color: #8e8e93;
 }
+/* ========== 移动端响应式布局 ========== */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;   /* 让目录和文章上下堆叠，而非左右排列 */
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    height: auto;             /* 高度由内容决定 */
+    position: relative;       /* 取消固定定位 */
+    border-right: none;
+    border-bottom: 0.5px solid var(--ios-separator);
+    padding: 1rem 1.2rem;
+  }
+
+  .main-content {
+    width: 100%;
+    padding: 1.5rem 1rem;
+  }
+
+  .glass-panel {
+    padding: 1.8rem 1.2rem;
+    border-radius: var(--border-radius-sm);
+  }
+}
