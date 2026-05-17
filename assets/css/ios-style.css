@@ -1,7 +1,7 @@
 /* ========== iOS 风格全局变量 ========== */
 :root {
   --ios-bg: #f2f2f7;
-  --ios-card-bg: rgba(255, 255, 255, 0.72);   /* 更通透 */
+  --ios-card-bg: rgba(255, 255, 255, 0.72);
   --ios-solid-card: #ffffff;
   --ios-text: #1c1c1e;
   --ios-secondary: #8e8e93;
@@ -33,12 +33,11 @@ body {
 .app-container {
   display: flex;
   min-height: 100vh;
-  /* 极轻微的背景模糊，让整体更柔和 */
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* ========== 左侧目录（半透玻璃，不抢眼） ========== */
+/* ========== 左侧目录 ========== */
 .sidebar {
   width: 25%;
   min-width: 230px;
@@ -56,7 +55,7 @@ body {
 }
 
 .sidebar-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .site-title {
@@ -67,189 +66,9 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* ========== 右侧内容区 ========== */
-.main-content {
-  width: 75%;
-  padding: 2.5rem 3rem;
-  overflow-y: auto;
-}
-
-/* 毛玻璃内容卡片 */
-.glass-panel {
-  background: var(--ios-card-bg);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border-radius: var(--border-radius-card);
-  padding: 2.5rem 2.8rem;
-  box-shadow: var(--ios-shadow-md);
-  border: 0.5px solid rgba(255, 255, 255, 0.6);
-  color: var(--ios-text);
-  max-width: 780px;
-  margin: 0 auto;
-}
-
-/* ========== 文章标题 ========== */
-.post-title, .page-title {
-  font-size: 2.2rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-bottom: 1.5rem;
-  line-height: 1.2;
-}
-
-/* 文章元信息 */
-.post-meta {
-  color: var(--ios-secondary);
-  font-size: 0.9rem;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 0.5px solid var(--ios-separator);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* ========== 链接与文本 ========== */
-a {
-  color: var(--ios-accent);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-a:hover {
-  text-decoration: underline;
-}
-
-/* 代码块 */
-pre, code {
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: var(--border-radius-sm);
-  padding: 0.2em 0.4em;
-  font-family: "SF Mono", Menlo, monospace;
-  font-size: 0.9em;
-}
-pre {
-  padding: 1.2rem;
-  overflow-x: auto;
-}
-
-hr {
-  border: none;
-  border-top: 0.5px solid var(--ios-separator);
-  margin: 2.5rem 0;
-}
-
-/* 隐藏首页默认文章列表 */
-.home .post-list {
-  display: none !important;
-}
-
-/* 文末装饰小点 */
-.post-content p:last-child::after {
-  content: "•  •  •";
-  display: block;
-  text-align: center;
-  margin-top: 3rem;
-  color: var(--ios-tertiary);
-  font-size: 0.9rem;
-  letter-spacing: 0.3em;
-}
-/* ========== 终端胶囊风格目录 ========== */
-.post-nav-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.post-capsule {
-  display: block;
-  padding: 0.9rem 1.2rem;
-  border-radius: 16px;               /* 圆润胶囊 */
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 0.5px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.post-capsule:hover {
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
-  transform: translateY(-1px);
-}
-
-.post-capsule.active {
-  background: rgba(120, 120, 128, 0.12);       /* iOS 风格的暖灰 */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-color: rgba(120, 120, 128, 0.2);
-  box-shadow: 0 0 0 1px rgba(120, 120, 128, 0.08);
-}
-
-.capsule-title {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #1c1c1e;
-  margin-bottom: 0.4rem;
-  letter-spacing: -0.01em;
-}
-
-.capsule-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  color: #8e8e93;
-  font-weight: 500;
-}
-
-.meta-sep {
-  color: #c7c7cc;
-}
-
-/* 阅读量占位文字，后续可通过 js 更新 */
-.pageviews {
-  color: #8e8e93;
-}
-/* ========== 移动端响应式布局 ========== */
-@media (max-width: 768px) {
-  .app-container {
-    flex-direction: column;
-  }
-
-  /* 只覆盖移动端需要的样式，不重写整个 .sidebar */
-  .sidebar {
-    width: 100%;
-    min-width: unset;
-    height: auto;                /* 取消固定高度，内容多高就多高 */
-    position: relative;          /* 取消 sticky，不再悬浮 */
-    border-right: none;
-    border-bottom: 0.5px solid var(--ios-separator);
-    padding: 1rem 1.2rem;
-    /* 以下两条是新增的滑动优化，桌面端不需要 */
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0,0,0,0.2) transparent;
-    /* 其余样式（背景、模糊、flex 等）完全继承桌面端，无需重写 */
-  }
-
-  .main-content {
-    width: 100%;
-    padding: 1.5rem 1rem;
-  }
-
-  .glass-panel {
-    padding: 1.8rem 1.2rem;
-    border-radius: var(--border-radius-sm);
-  }
-}
 /* ========== 个人介绍卡片 ========== */
 .profile-card {
-  margin: 1.5rem 0 2rem 0;
+  margin: 0 0 2rem 0;
 }
 
 .profile-link {
@@ -260,7 +79,7 @@ hr {
   border-radius: 18px;
   padding: 1.2rem;
   text-decoration: none;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  box-shadow: var(--ios-shadow-sm);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -299,4 +118,182 @@ hr {
   font-size: 0.8rem;
   color: #8e8e93;
   line-height: 1.4;
+}
+
+/* ========== 终端胶囊风格目录（竖向） ========== */
+.post-nav-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;  /* 确保竖向排列 */
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+}
+
+.post-capsule {
+  display: block;
+  padding: 0.9rem 1.2rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.post-capsule:hover {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+}
+
+.post-capsule.active {
+  background: rgba(120, 120, 128, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-color: rgba(120, 120, 128, 0.2);
+  box-shadow: 0 0 0 1px rgba(120, 120, 128, 0.08);
+}
+
+.capsule-title {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1c1c1e;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+}
+
+.capsule-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #8e8e93;
+  font-weight: 500;
+}
+
+.meta-sep {
+  color: #c7c7cc;
+}
+
+.pageviews {
+  color: #8e8e93;
+}
+
+/* ========== 右侧内容区 ========== */
+.main-content {
+  width: 75%;
+  padding: 2.5rem 3rem;
+  overflow-y: auto;
+}
+
+.glass-panel {
+  background: var(--ios-card-bg);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-radius: var(--border-radius-card);
+  padding: 2.5rem 2.8rem;
+  box-shadow: var(--ios-shadow-md);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  color: var(--ios-text);
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+/* ========== 文章标题与元信息 ========== */
+.post-title, .page-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
+}
+
+.post-meta {
+  color: var(--ios-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 0.5px solid var(--ios-separator);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ========== 基础样式 ========== */
+a {
+  color: var(--ios-accent);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+pre, code {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--border-radius-sm);
+  padding: 0.2em 0.4em;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+}
+pre {
+  padding: 1.2rem;
+  overflow-x: auto;
+}
+
+hr {
+  border: none;
+  border-top: 0.5px solid var(--ios-separator);
+  margin: 2.5rem 0;
+}
+
+.home .post-list {
+  display: none !important;
+}
+
+.post-content p:last-child::after {
+  content: "•  •  •";
+  display: block;
+  text-align: center;
+  margin-top: 3rem;
+  color: var(--ios-tertiary);
+  font-size: 0.9rem;
+  letter-spacing: 0.3em;
+}
+
+/* ========== 移动端响应式布局 ========== */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 0.5px solid var(--ios-separator);
+    padding: 1rem 1.2rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.2) transparent;
+  }
+
+  .main-content {
+    width: 100%;
+    padding: 1.5rem 1rem;
+  }
+
+  .glass-panel {
+    padding: 1.8rem 1.2rem;
+    border-radius: var(--border-radius-sm);
+  }
 }
