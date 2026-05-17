@@ -1,0 +1,160 @@
+---
+---
+// 引入 minima 原始样式，我们在此基础上覆盖
+@import "minima";
+
+// ========== iOS 风格变量 ==========
+$ios-bg: #f2f2f7;              // 系统浅灰背景
+$ios-card-bg: #ffffff;         // 卡片白
+$ios-text: #1c1c1e;            // 主文字色
+$ios-secondary: #8e8e93;       // 辅助文字
+$ios-accent: #007aff;          // 系统蓝
+$ios-separator: rgba(60, 60, 67, 0.12);
+
+// ========== 全局重置 ==========
+body {
+  background-color: $ios-bg;
+  color: $ios-text;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+// 去掉 minima 默认的边框和背景
+.site-header, .site-footer, .page-content, .post-content {
+  background: transparent !important;
+  border: none !important;
+}
+
+// ========== 主容器卡片化 ==========
+.page-content .wrapper {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+}
+
+// ========== 导航栏毛玻璃效果 ==========
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgba(242, 242, 247, 0.7);
+  border-bottom: 0.5px solid $ios-separator !important;
+  padding: 0.75rem 0;
+  
+  .wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+  }
+  
+  .site-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: $ios-text;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  
+  .site-nav {
+    background: transparent;
+    a {
+      color: $ios-accent;
+      font-weight: 500;
+    }
+  }
+}
+
+// ========== 文章列表（首页）卡片化 ==========
+.home .post-list {
+  margin-top: 0;
+  
+  > li {
+    background: $ios-card-bg;
+    border-radius: 16px;
+    padding: 1.5rem 1.5rem 1.2rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -12px rgba(0,0,0,0.15), 0 4px 10px -4px rgba(0,0,0,0.04);
+    }
+  }
+  
+  .post-link {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $ios-text;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    margin-bottom: 0.5rem;
+    
+    &:hover {
+      color: $ios-accent;
+    }
+  }
+  
+  .post-meta {
+    color: $ios-secondary;
+    font-size: 0.9rem;
+    font-weight: 400;
+  }
+}
+
+// ========== 文章内页卡片 ==========
+.post {
+  background: $ios-card-bg;
+  border-radius: 20px;
+  padding: 2rem 1.8rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  
+  .post-title {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: $ios-text;
+    margin-top: 0;
+  }
+  
+  .post-meta {
+    color: $ios-secondary;
+    font-size: 0.95rem;
+    border-bottom: 1px solid $ios-separator;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+// ========== 链接与按钮 ==========
+a {
+  color: $ios-accent;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// ========== 代码块（轻微磨砂） ==========
+pre, code {
+  background: #f5f5f7;
+  border-radius: 10px;
+}
+
+// ========== 页脚简化 ==========
+.site-footer {
+  text-align: center;
+  padding: 2rem 0;
+  color: $ios-secondary;
+  font-size: 0.85rem;
+}
