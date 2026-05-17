@@ -87,11 +87,6 @@ body {
   transition: all 0.2s ease;
 }
 
-.post-nav-list a:hover {
-  background: rgba(0, 122, 255, 0.08);
-  color: var(--ios-accent);
-}
-
 /* ========== 右侧内容区 ========== */
 .main-content {
   width: 75%;
