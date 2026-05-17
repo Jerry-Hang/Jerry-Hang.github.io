@@ -1,5 +1,11 @@
 title: 我的博客
 description: "记录每次的技术折腾。"
 author: "Jerry-hung"
+
+# 插件配置（独立）
 plugins:
   - jekyll-seo-tag
+
+# Liquid 配置（独立顶级配置，不能缩进在 plugins 下）
+liquid:
+  strict_filters: false
