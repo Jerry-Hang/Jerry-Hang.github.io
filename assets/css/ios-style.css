@@ -1,13 +1,14 @@
-/* ========== 全局重置 ========== */
+/* ========== 全局重置与字体 ========== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-  color: #1c1c1e;
-  line-height: 1.5;
+  /* 选用有东方气质的衬线字体，系统默认无衬线作为后备 */
+  font-family: "Noto Serif SC", "Songti SC", "Source Han Serif SC", Georgia, serif;
+  color: #333;
+  line-height: 1.8; /* 加大行高，增加留白感 */
   -webkit-font-smoothing: antialiased;
+  /* 背景图，路径换成你自己的。用 fixed 制造一种沉稳的沉浸感 */
   background: url('/assets/images/bg.jpg') center/cover fixed;
-  /* 替换为你的图片路径 */
   min-height: 100vh;
 }
 
@@ -15,134 +16,142 @@ body {
 .app-container {
   display: flex;
   min-height: 100vh;
-  backdrop-filter: blur(2px);  /* 全屏轻微模糊，让背景更柔和 */
 }
 
-/* ========== 左侧目录（不透明） ========== */
+/* ========== 左侧目录（不透明，模仿纸张） ========== */
 .sidebar {
   width: 25%;
   min-width: 220px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-right: 0.5px solid rgba(60,60,67,0.1);
+  background: rgba(255, 255, 255, 0.9);
+  /* 取消之前的模糊，用纯色营造干净侧边栏 */
+  border-right: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
-  padding: 2rem 1.2rem;
+  padding: 3rem 1.5rem; /* 增加内边距，更透气 */
   overflow-y: auto;
   height: 100vh;
   position: sticky;
   top: 0;
 }
 
-.sidebar-header {
-  margin-bottom: 2rem;
-}
+.sidebar-header { margin-bottom: 2.5rem; }
 
 .site-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #1c1c1e;
+  font-size: 1.4rem;
+  font-weight: normal; /* 不用加粗，用正常字重 */
+  color: #444;
   text-decoration: none;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.05em; /* 轻微字间距 */
 }
 
-/* 文章导航列表 */
-.post-nav-list {
-  list-style: none;
-}
-
-.post-nav-list li {
-  margin-bottom: 0.6rem;
-}
-
+/* 导航列表 */
+.post-nav-list { list-style: none; }
+.post-nav-list li { margin-bottom: 0.8rem; }
 .post-nav-list a {
   display: block;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  color: #3a3a3c;
+  padding: 0.5rem 0; /* 减少左右内边距，更简约 */
+  color: #666;
   text-decoration: none;
   font-size: 0.95rem;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  border-bottom: 1px solid transparent; /* 为悬停效果占位 */
+  transition: color 0.3s, border-color 0.3s;
 }
-
 .post-nav-list a:hover {
-  background: rgba(0,122,255,0.08);
-  color: #007aff;
+  color: #b23a2e; /* 用一点朱砂红代替常规蓝，作为强调色 */
+  border-bottom-color: #b23a2e;
 }
-
 .post-nav-list a.active {
-  background: #007aff;
-  color: #fff;
-  font-weight: 600;
+  color: #b23a2e;
+  font-weight: bold;
 }
 
-/* ========== 右侧内容区 ========== */
+/* ========== 右侧内容区（通透玻璃） ========== */
 .main-content {
   width: 75%;
-  padding: 2rem 2.5rem;
+  padding: 4rem 3rem; /* 大量留白 */
   overflow-y: auto;
 }
 
-/* 毛玻璃面板 */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 2.5rem 2.5rem;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.05);
-  border: 0.5px solid rgba(255,255,255,0.5);
-  color: #1c1c1e;
-  max-width: 800px;
+  /* 半透明白色，营造纸上水墨的感觉 */
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 2px; /* 微小的圆角，保持锐利感 */
+  padding: 3rem 4rem; /* 内部左右留白更多 */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+  border: 1px solid rgba(255,255,255,0.8);
+  color: #444;
+  max-width: 750px;
   margin: 0 auto;
 }
 
-/* 文章标题 */
+/* ========== 文章标题：核心风格 ========== */
 .post-title, .page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-bottom: 1rem;
+  font-size: 2.2rem;
+  font-weight: normal; /* 不用粗体，显素雅 */
+  letter-spacing: 0.03em;
+  margin-bottom: 2rem;
+  color: #2c2c2c;
+  line-height: 1.4;
 }
 
-/* 文章元信息 */
+/* 元信息 */
 .post-meta {
-  color: #8e8e93;
-  font-size: 0.9rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(60,60,67,0.1);
-  padding-bottom: 0.8rem;
+  color: #999;
+  font-size: 0.85rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e8e8e8;
+  font-style: italic;
 }
 
-/* 普通链接 */
+/* ========== 文字倾斜特效（鼠标悬停试试） ========== */
+.tilt-text {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.tilt-text:hover {
+  transform: rotate(-1.5deg);
+  color: #b23a2e; /* 悬停时变红 */
+}
+
+/* ========== 通用元素美化 ========== */
 a {
-  color: #007aff;
+  color: #b23a2e;
   text-decoration: none;
+  transition: color 0.2s;
 }
-a:hover {
-  text-decoration: underline;
-}
-
-/* 代码块等通用美化 */
-pre, code {
-  background: rgba(0,0,0,0.03);
-  border-radius: 10px;
-  padding: 0.2em 0.4em;
-  font-family: "SF Mono", Menlo, monospace;
-}
-pre {
-  padding: 1rem;
-  overflow-x: auto;
-}
+a:hover { color: #8a1c15; }
 
 hr {
   border: none;
-  border-top: 0.5px solid rgba(60,60,67,0.15);
-  margin: 2rem 0;
+  border-top: 1px solid #e8e8e8;
+  margin: 3rem 0;
 }
 
-/* 隐藏首页的默认文章列表（双重保险） */
-.home .post-list {
-  display: none !important;
+pre, code {
+  background: #f9f9f9;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+  padding: 0.2em 0.4em;
+}
+pre {
+  padding: 1.5rem;
+  overflow-x: auto;
+  border: 1px solid #eee;
+}
+
+/* 隐藏首页默认文章列表 */
+.home .post-list { display: none !important; }
+
+/* 实现一个小而美的返回顶部或文末装饰 */
+.post-content p:last-child::after {
+  content: "— ✦ —";
+  display: block;
+  text-align: center;
+  margin-top: 3rem;
+  color: #ccc;
+  font-size: 0.9rem;
 }
