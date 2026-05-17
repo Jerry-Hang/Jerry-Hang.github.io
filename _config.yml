@@ -1,3 +1,5 @@
 title: 我的博客
 description: "记录每次的技术折腾。"
 author: "Jerry-hung"
+plugins:
+  - jekyll-seo-tag
