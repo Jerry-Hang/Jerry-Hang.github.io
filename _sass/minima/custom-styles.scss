@@ -1,17 +1,15 @@
----
----
-// 引入 minima 原始样式，我们在此基础上覆盖
-@import "minima";
+// 首先，用可靠的方式确保 Minima 的基础样式被加载
+@import "minima-2.5"; // 兼容 GitHub Pages 的旧版 Minima
+@import "minima-3.0"; // 同时尝试加载新版
 
-// ========== iOS 风格变量 ==========
-$ios-bg: #f2f2f7;              // 系统浅灰背景
-$ios-card-bg: #ffffff;         // 卡片白
-$ios-text: #1c1c1e;            // 主文字色
-$ios-secondary: #8e8e93;       // 辅助文字
-$ios-accent: #007aff;          // 系统蓝
+// ========== 以下是你之前准备的 iOS 风格变量和样式，全都复制进来 ==========
+$ios-bg: #f2f2f7;
+$ios-card-bg: #ffffff;
+$ios-text: #1c1c1e;
+$ios-secondary: #8e8e93;
+$ios-accent: #007aff;
 $ios-separator: rgba(60, 60, 67, 0.12);
 
-// ========== 全局重置 ==========
 body {
   background-color: $ios-bg;
   color: $ios-text;
@@ -22,20 +20,17 @@ body {
   padding: 0;
 }
 
-// 去掉 minima 默认的边框和背景
 .site-header, .site-footer, .page-content, .post-content {
   background: transparent !important;
   border: none !important;
 }
 
-// ========== 主容器卡片化 ==========
 .page-content .wrapper {
   max-width: 680px;
   margin: 0 auto;
   padding: 1rem 1.25rem;
 }
 
-// ========== 导航栏毛玻璃效果 ==========
 .site-header {
   position: sticky;
   top: 0;
@@ -72,7 +67,6 @@ body {
   }
 }
 
-// ========== 文章列表（首页）卡片化 ==========
 .home .post-list {
   margin-top: 0;
   
@@ -111,7 +105,6 @@ body {
   }
 }
 
-// ========== 文章内页卡片 ==========
 .post {
   background: $ios-card-bg;
   border-radius: 20px;
@@ -136,7 +129,6 @@ body {
   }
 }
 
-// ========== 链接与按钮 ==========
 a {
   color: $ios-accent;
   text-decoration: none;
@@ -145,13 +137,11 @@ a {
   }
 }
 
-// ========== 代码块（轻微磨砂） ==========
 pre, code {
   background: #f5f5f7;
   border-radius: 10px;
 }
 
-// ========== 页脚简化 ==========
 .site-footer {
   text-align: center;
   padding: 2rem 0;
