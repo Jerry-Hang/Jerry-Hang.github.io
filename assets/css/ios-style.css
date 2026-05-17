@@ -92,13 +92,6 @@ body {
   color: var(--ios-accent);
 }
 
-.post-nav-list a.active {
-  background: var(--ios-accent);
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.25);
-}
-
 /* ========== 右侧内容区 ========== */
 .main-content {
   width: 75%;
