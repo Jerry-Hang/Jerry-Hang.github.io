@@ -1,157 +1,187 @@
-/* ========== 全局重置与字体 ========== */
+/* ========== iOS 风格全局变量 ========== */
+:root {
+  --ios-bg: #f2f2f7;
+  --ios-card-bg: rgba(255, 255, 255, 0.72);   /* 更通透 */
+  --ios-solid-card: #ffffff;
+  --ios-text: #1c1c1e;
+  --ios-secondary: #8e8e93;
+  --ios-tertiary: #c7c7cc;
+  --ios-accent: #007aff;
+  --ios-separator: rgba(60, 60, 67, 0.12);
+  --ios-shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --ios-shadow-md: 0 8px 32px rgba(0,0,0,0.06);
+  --ios-shadow-hover: 0 14px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.04);
+  --border-radius-card: 22px;
+  --border-radius-sm: 14px;
+}
+
+/* ========== 全局重置 ========== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  /* 选用有东方气质的衬线字体，系统默认无衬线作为后备 */
-  font-family: "Noto Serif SC", "Songti SC", "Source Han Serif SC", Georgia, serif;
-  color: #333;
-  line-height: 1.8; /* 加大行高，增加留白感 */
+  background-color: var(--ios-bg);
+  color: var(--ios-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
-  /* 背景图，路径换成你自己的。用 fixed 制造一种沉稳的沉浸感 */
+  line-height: 1.5;
+  letter-spacing: -0.01em;
   background: url('/assets/images/bg.jpg') center/cover fixed;
   min-height: 100vh;
 }
 
-/* ========== 应用容器（双栏） ========== */
+/* ========== 双栏容器 ========== */
 .app-container {
   display: flex;
   min-height: 100vh;
+  /* 极轻微的背景模糊，让整体更柔和 */
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
-/* ========== 左侧目录（不透明，模仿纸张） ========== */
+/* ========== 左侧目录（半透玻璃，不抢眼） ========== */
 .sidebar {
   width: 25%;
-  min-width: 220px;
-  background: rgba(255, 255, 255, 0.9);
-  /* 取消之前的模糊，用纯色营造干净侧边栏 */
-  border-right: 1px solid #e8e8e8;
+  min-width: 230px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border-right: 0.5px solid rgba(60, 60, 67, 0.1);
   display: flex;
   flex-direction: column;
-  padding: 3rem 1.5rem; /* 增加内边距，更透气 */
+  padding: 2rem 1.5rem;
   overflow-y: auto;
   height: 100vh;
   position: sticky;
   top: 0;
 }
 
-.sidebar-header { margin-bottom: 2.5rem; }
+.sidebar-header {
+  margin-bottom: 2.5rem;
+}
 
 .site-title {
   font-size: 1.4rem;
-  font-weight: normal; /* 不用加粗，用正常字重 */
-  color: #444;
+  font-weight: 700;
+  color: var(--ios-text);
   text-decoration: none;
-  letter-spacing: 0.05em; /* 轻微字间距 */
+  letter-spacing: -0.02em;
 }
 
-/* 导航列表 */
-.post-nav-list { list-style: none; }
-.post-nav-list li { margin-bottom: 0.8rem; }
+/* 目录列表 */
+.post-nav-list {
+  list-style: none;
+}
+
+.post-nav-list li {
+  margin-bottom: 0.5rem;
+}
+
 .post-nav-list a {
   display: block;
-  padding: 0.5rem 0; /* 减少左右内边距，更简约 */
-  color: #666;
+  padding: 0.7rem 1rem;
+  border-radius: var(--border-radius-sm);
+  color: #3a3a3c;
   text-decoration: none;
   font-size: 0.95rem;
-  border-bottom: 1px solid transparent; /* 为悬停效果占位 */
-  transition: color 0.3s, border-color 0.3s;
-}
-.post-nav-list a:hover {
-  color: #b23a2e; /* 用一点朱砂红代替常规蓝，作为强调色 */
-  border-bottom-color: #b23a2e;
-}
-.post-nav-list a.active {
-  color: #b23a2e;
-  font-weight: bold;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-/* ========== 右侧内容区（通透玻璃） ========== */
+.post-nav-list a:hover {
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--ios-accent);
+}
+
+.post-nav-list a.active {
+  background: var(--ios-accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.25);
+}
+
+/* ========== 右侧内容区 ========== */
 .main-content {
   width: 75%;
-  padding: 4rem 3rem; /* 大量留白 */
+  padding: 2.5rem 3rem;
   overflow-y: auto;
 }
 
+/* 毛玻璃内容卡片 */
 .glass-panel {
-  /* 半透明白色，营造纸上水墨的感觉 */
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border-radius: 2px; /* 微小的圆角，保持锐利感 */
-  padding: 3rem 4rem; /* 内部左右留白更多 */
-  box-shadow: 0 10px 30px rgba(0,0,0,0.03);
-  border: 1px solid rgba(255,255,255,0.8);
-  color: #444;
-  max-width: 750px;
+  background: var(--ios-card-bg);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-radius: var(--border-radius-card);
+  padding: 2.5rem 2.8rem;
+  box-shadow: var(--ios-shadow-md);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  color: var(--ios-text);
+  max-width: 780px;
   margin: 0 auto;
 }
 
-/* ========== 文章标题：核心风格 ========== */
+/* ========== 文章标题 ========== */
 .post-title, .page-title {
   font-size: 2.2rem;
-  font-weight: normal; /* 不用粗体，显素雅 */
-  letter-spacing: 0.03em;
-  margin-bottom: 2rem;
-  color: #2c2c2c;
-  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.5rem;
+  line-height: 1.2;
 }
 
-/* 元信息 */
+/* 文章元信息 */
 .post-meta {
-  color: #999;
-  font-size: 0.85rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e8e8e8;
-  font-style: italic;
+  color: var(--ios-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 0.5px solid var(--ios-separator);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* ========== 文字倾斜特效（鼠标悬停试试） ========== */
-.tilt-text {
-  display: inline-block;
-  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-.tilt-text:hover {
-  transform: rotate(-1.5deg);
-  color: #b23a2e; /* 悬停时变红 */
-}
-
-/* ========== 通用元素美化 ========== */
+/* ========== 链接与文本 ========== */
 a {
-  color: #b23a2e;
+  color: var(--ios-accent);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.15s;
 }
-a:hover { color: #8a1c15; }
+a:hover {
+  text-decoration: underline;
+}
+
+/* 代码块 */
+pre, code {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--border-radius-sm);
+  padding: 0.2em 0.4em;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+}
+pre {
+  padding: 1.2rem;
+  overflow-x: auto;
+}
 
 hr {
   border: none;
-  border-top: 1px solid #e8e8e8;
-  margin: 3rem 0;
-}
-
-pre, code {
-  background: #f9f9f9;
-  border-radius: 4px;
-  font-family: "SF Mono", Menlo, monospace;
-  font-size: 0.9em;
-  padding: 0.2em 0.4em;
-}
-pre {
-  padding: 1.5rem;
-  overflow-x: auto;
-  border: 1px solid #eee;
+  border-top: 0.5px solid var(--ios-separator);
+  margin: 2.5rem 0;
 }
 
 /* 隐藏首页默认文章列表 */
-.home .post-list { display: none !important; }
+.home .post-list {
+  display: none !important;
+}
 
-/* 实现一个小而美的返回顶部或文末装饰 */
+/* 文末装饰小点 */
 .post-content p:last-child::after {
-  content: "— ✦ —";
+  content: "•  •  •";
   display: block;
   text-align: center;
   margin-top: 3rem;
-  color: #ccc;
+  color: var(--ios-tertiary);
   font-size: 0.9rem;
+  letter-spacing: 0.3em;
 }
