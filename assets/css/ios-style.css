@@ -237,17 +237,24 @@ hr {
 /* ========== 移动端响应式布局 ========== */
 @media (max-width: 768px) {
   .app-container {
-    flex-direction: column;   /* 让目录和文章上下堆叠，而非左右排列 */
+    flex-direction: column;
   }
 
+  /* 只覆盖移动端需要的样式，不重写整个 .sidebar */
   .sidebar {
     width: 100%;
     min-width: unset;
-    height: auto;             /* 高度由内容决定 */
-    position: relative;       /* 取消固定定位 */
+    height: auto;                /* 取消固定高度，内容多高就多高 */
+    position: relative;          /* 取消 sticky，不再悬浮 */
     border-right: none;
     border-bottom: 0.5px solid var(--ios-separator);
     padding: 1rem 1.2rem;
+    /* 以下两条是新增的滑动优化，桌面端不需要 */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.2) transparent;
+    /* 其余样式（背景、模糊、flex 等）完全继承桌面端，无需重写 */
   }
 
   .main-content {
