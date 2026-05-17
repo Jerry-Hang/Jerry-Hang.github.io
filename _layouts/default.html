@@ -15,16 +15,23 @@
         <a href="{{ '/' | relative_url }}" class="site-title">{{ site.title }}</a>
       </div>
       <nav class="sidebar-nav">
-        <ul class="post-nav-list">
-          {% for post in site.posts %}
-            <li>
-              <a href="{{ post.url | relative_url }}" {% if page.url == post.url %}class="active"{% endif %}>
-                {{ post.title }}
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </nav>
+  <ul class="post-nav-list">
+    {% for post in site.posts %}
+      <li>
+        <a href="{{ post.url | relative_url }}" class="post-capsule {% if page.url == post.url %}active{% endif %}">
+          <span class="capsule-title">{{ post.title }}</span>
+          <span class="capsule-meta">
+            <time datetime="{{ post.date | date: '%Y-%m-%d' }}">{{ post.date | date: '%m/%d' }}</time>
+            <span class="meta-sep">·</span>
+            <span>{{ post.content | number_of_words | divided_by: 400 | plus: 1 }} 分钟</span>
+            <span class="meta-sep">·</span>
+            <span class="pageviews" data-post-url="{{ post.url }}">-- 阅读</span>
+          </span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
     </aside>
 
     <!-- 右侧内容区（毛玻璃） -->

@@ -185,3 +185,62 @@ hr {
   font-size: 0.9rem;
   letter-spacing: 0.3em;
 }
+/* ========== 终端胶囊风格目录 ========== */
+.post-nav-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.post-capsule {
+  display: block;
+  padding: 0.9rem 1.2rem;
+  border-radius: 16px;               /* 圆润胶囊 */
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.post-capsule:hover {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  transform: translateY(-1px);
+}
+
+.post-capsule.active {
+  background: rgba(0, 122, 255, 0.15);
+  border-color: rgba(0, 122, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.2);
+}
+
+.capsule-title {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1c1c1e;
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+}
+
+.capsule-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #8e8e93;
+  font-weight: 500;
+}
+
+.meta-sep {
+  color: #c7c7cc;
+}
+
+/* 阅读量占位文字，后续可通过 js 更新 */
+.pageviews {
+  color: #8e8e93;
+}
