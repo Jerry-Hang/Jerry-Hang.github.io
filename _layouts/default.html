@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% seo %}
+  <link rel="stylesheet" href="{{ '/assets/css/ios-style.css' | relative_url }}">
+  {% feed_meta %}
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左侧目录（不透明） -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="{{ '/' | relative_url }}" class="site-title">{{ site.title }}</a>
+      </div>
+      <nav class="sidebar-nav">
+        <ul class="post-nav-list">
+          {% for post in site.posts %}
+            <li>
+              <a href="{{ post.url | relative_url }}" {% if page.url == post.url %}class="active"{% endif %}>
+                {{ post.title }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- 右侧内容区（毛玻璃） -->
+    <main class="main-content">
+      <div class="glass-panel">
+        {{ content }}
+      </div>
+    </main>
+  </div>
+</body>
+</html>
