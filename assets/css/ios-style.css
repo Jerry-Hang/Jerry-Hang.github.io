@@ -343,31 +343,98 @@ hr {
 .resume-link:hover {
   opacity: 1;
 }
+/* ========== 暗夜模式变量 ========== */
+body.dark {
+  --ios-bg: #1c1c1e;
+  --ios-card-bg: rgba(44, 44, 46, 0.75);
+  --ios-solid-card: #2c2c2e;
+  --ios-text: #f2f2f7;
+  --ios-secondary: #aeaeb2;
+  --ios-tertiary: #636366;
+  --ios-accent: #0a84ff;
+  --ios-separator: rgba(255, 255, 255, 0.12);
+  --ios-shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --ios-shadow-md: 0 8px 32px rgba(0,0,0,0.4);
+  --ios-shadow-hover: 0 14px 40px rgba(0,0,0,0.5);
+}
 
-/* ========== 修复反光：鼠标悬停时也划过高光 ========== */
-.post-capsule::after {
+/* ========== 通用高光 + 抖动 ========== */
+.interactive-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.interactive-shine::after {
   content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
   transform: skewX(-20deg);
   transition: left 0.5s ease;
+  pointer-events: none;
 }
-.post-capsule:hover::after,
-.post-capsule:active::after {
+
+.interactive-shine:hover::after {
   left: 120%;
 }
 
-/* 抖动保留在点击时（手机触屏） */
+.interactive-shine:active {
+  animation: gentle-shake 0.3s ease;
+}
+
 @keyframes gentle-shake {
   0% { transform: translateX(0); }
   25% { transform: translateX(-2px); }
   75% { transform: translateX(2px); }
   100% { transform: translateX(0); }
 }
-.post-capsule:active {
-  animation: gentle-shake 0.3s ease;
+
+/* ========== 暗夜模式切换按钮 ========== */
+.theme-toggle {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.3rem;
+  margin-bottom: 1rem;
+  align-self: flex-end;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.theme-toggle:hover { opacity: 1; }
+
+/* ========== 搜索框 ========== */
+.search-container {
+  margin: 0 0 1.2rem 0;
+}
+.search-input {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border-radius: 14px;
+  border: 0.5px solid rgba(60,60,67,0.15);
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 0.9rem;
+  color: var(--ios-text);
+  outline: none;
+  transition: background 0.2s;
+}
+.search-input::placeholder { color: var(--ios-secondary); }
+.search-input:focus {
+  background: rgba(255,255,255,0.7);
+  box-shadow: 0 0 0 2px rgba(0,122,255,0.3);
+}
+
+/* ========== 右侧内容面板轻微倾斜 ========== */
+.glass-panel {
+  transform: rotate(0.2deg);
+}
+@media (max-width: 768px) {
+  .glass-panel {
+    transform: rotate(0);
+  }
 }
