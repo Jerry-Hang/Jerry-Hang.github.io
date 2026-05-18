@@ -437,37 +437,59 @@ body.dark {
     transform: rotate(0);
   }
 }
-/* ========== 暗夜模式细节修复 ========== */
+/* ========== 暗夜模式细节修复（增强覆盖） ========== */
 body.dark .site-title,
 body.dark .capsule-title,
 body.dark .profile-name,
 body.dark .profile-bio,
 body.dark .capsule-excerpt,
 body.dark .post-title,
-body.dark .page-title {
-  color: var(--ios-text);
+body.dark .page-title,
+body.dark .post-content,
+body.dark .glass-panel p,
+body.dark .glass-panel li,
+body.dark .glass-panel span {
+  color: var(--ios-text) !important;
 }
 
 body.dark .capsule-meta,
 body.dark .meta-sep,
 body.dark .pageviews,
-body.dark .resume-link {
-  color: var(--ios-secondary);
+body.dark .resume-link,
+body.dark .post-meta {
+  color: var(--ios-secondary) !important;
 }
 
 body.dark .search-input {
-  background: rgba(30, 30, 30, 0.6);
-  color: var(--ios-text);
-  border-color: rgba(255,255,255,0.1);
+  background: rgba(30, 30, 30, 0.6) !important;
+  color: var(--ios-text) !important;
+  border-color: rgba(255,255,255,0.1) !important;
 }
 
 body.dark .tag {
-  background: rgba(10, 132, 255, 0.2);
-  color: #0a84ff;
+  background: rgba(10, 132, 255, 0.2) !important;
+  color: #0a84ff !important;
 }
 
-/* 确保毛玻璃面板在暗夜下也有层次 */
 body.dark .glass-panel {
-  background: rgba(30, 30, 30, 0.7);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(30, 30, 30, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.dark .profile-link {
+  background: rgba(30, 30, 30, 0.7) !important;
+}
+
+body.dark .post-capsule {
+  background: rgba(30, 30, 30, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 如果背景图在暗夜下太亮，可以加一层深色遮罩 */
+body.dark::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: -1;
 }
