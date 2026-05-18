@@ -493,3 +493,40 @@ body.dark::before {
   background: rgba(0, 0, 0, 0.4);
   z-index: -1;
 }
+/* ========== Eric Terminal 风格：悬浮晃动吸附 ========== */
+.interactive-shine {
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+              box-shadow 0.3s ease;
+}
+
+.interactive-shine:hover {
+  transform: translateY(-2px) scale(1.01);  /* 轻微上浮并放大，产生“吸附”感 */
+  box-shadow: 0 12px 28px rgba(0,0,0,0.12); /* 增强阴影，模拟浮起 */
+}
+
+/* 对于文章胶囊，保留原有的悬停上浮效果，但增加晃动感 */
+.post-capsule:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+}
+
+/* 个人介绍卡片悬停 */
+.profile-link:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.1);
+}
+
+/* 搜索框聚焦时也有一点吸附感 */
+.search-input:focus {
+  transform: scale(1.01);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.25);
+}
+/* ========== 文字倾斜特效 ========== */
+.tilt-text {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.tilt-text:hover {
+  transform: rotate(-1.5deg);
+  color: #b23a2e;  /* 可以换成你喜欢的强调色，比如朱砂红 */
+}
