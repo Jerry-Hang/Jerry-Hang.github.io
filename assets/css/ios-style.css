@@ -295,3 +295,92 @@ hr {
     border-radius: var(--border-radius-sm);
   }
 }
+/* ========== iOS 主题细节增强 ========== */
+
+/* 1. 让整体背景色更柔和，接近 iOS 浅灰 */
+body {
+  background-color: #f5f5f7; /* 覆盖变量中的背景，更接近真实 iOS */
+}
+
+/* 2. 优化选中胶囊的质感，微调透明度 */
+.post-capsule.active {
+  background: rgba(142, 142, 147, 0.14); /* 更细腻的 iOS 灰 */
+  border-color: rgba(142, 142, 147, 0.25);
+}
+
+/* 3. 胶囊轻微抖动与高光划过效果 */
+.post-capsule {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 高光掠过效果 */
+.post-capsule::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+
+.post-capsule:hover::after {
+  left: 120%;
+}
+
+/* 点击时的轻微抖动动画 */
+@keyframes gentle-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+.post-capsule:active {
+  animation: gentle-shake 0.3s ease;
+}
+
+/* 4. 个人介绍卡片也加入高光效果 */
+.profile-link {
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-link::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: skewX(-15deg);
+  transition: left 0.6s ease;
+}
+
+.profile-link:hover::after {
+  left: 120%;
+}
+
+/* 5. 文章卡片增加微妙的悬浮感 */
+.glass-panel {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
