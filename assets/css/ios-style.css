@@ -16,7 +16,12 @@
 }
 
 /* ========== 全局重置 ========== */
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
 
 body {
   background-color: var(--ios-bg);
@@ -141,6 +146,8 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
   text-decoration: none;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .post-capsule:hover {
@@ -230,7 +237,7 @@ a {
   transition: color 0.15s;
 }
 a:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 pre, code {
@@ -295,17 +302,8 @@ hr {
     border-radius: var(--border-radius-sm);
   }
 }
-/* ========== 链接悬停去掉下划线 ========== */
-a:hover {
-  text-decoration: none;   /* 原来这里是 underline，现在去掉 */
-}
 
 /* ========== 胶囊触碰抖动 + 反光 ========== */
-.post-capsule {
-  position: relative;
-  overflow: hidden;        /* 让反光不溢出 */
-}
-
 /* 高光掠过效果 */
 .post-capsule::after {
   content: "";
