@@ -1,4 +1,4 @@
-/* ========== iOS 风格全局变量 ========== */
+/* ========== iOS 风格全局变量（优化） ========== */
 :root {
   --ios-bg: #f2f2f7;
   --ios-card-bg: rgba(255, 255, 255, 0.72);
@@ -29,7 +29,7 @@ body {
   min-height: 100vh;
 }
 
-/* ========== 双栏容器 ========== */
+/* ========== 双栏容器（增强柔和感） ========== */
 .app-container {
   display: flex;
   min-height: 100vh;
@@ -37,14 +37,14 @@ body {
   -webkit-backdrop-filter: blur(3px);
 }
 
-/* ========== 左侧目录 ========== */
+/* ========== 左侧目录（更通透） ========== */
 .sidebar {
   width: 25%;
   min-width: 230px;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border-right: 0.5px solid rgba(60, 60, 67, 0.1);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-right: 0.5px solid rgba(60, 60, 67, 0.08);
   display: flex;
   flex-direction: column;
   padding: 2rem 1.5rem;
@@ -66,26 +66,26 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* ========== 个人介绍卡片 ========== */
+/* ========== 个人介绍卡片（增强质感） ========== */
 .profile-card {
   margin: 0 0 2rem 0;
 }
 
 .profile-link {
   display: block;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: 18px;
   padding: 1.2rem;
   text-decoration: none;
-  box-shadow: var(--ios-shadow-sm);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .profile-link:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
 .avatar {
@@ -94,7 +94,7 @@ body {
   border-radius: 50%;
   overflow: hidden;
   margin: 0 auto 0.8rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .avatar img {
@@ -120,11 +120,11 @@ body {
   line-height: 1.4;
 }
 
-/* ========== 终端胶囊风格目录（竖向） ========== */
+/* ========== 终端胶囊目录（优化悬停） ========== */
 .post-nav-list {
   list-style: none;
   display: flex;
-  flex-direction: column;  /* 确保竖向排列 */
+  flex-direction: column;
   gap: 0.8rem;
   margin: 0;
   padding: 0;
@@ -134,27 +134,25 @@ body {
   display: block;
   padding: 0.9rem 1.2rem;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 0.5px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 0.5px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
   text-decoration: none;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
 }
 
 .post-capsule:hover {
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
   transform: translateY(-1px);
 }
 
 .post-capsule.active {
-  background: rgba(120, 120, 128, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(120, 120, 128, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-color: rgba(120, 120, 128, 0.2);
   box-shadow: 0 0 0 1px rgba(120, 120, 128, 0.08);
 }
@@ -185,7 +183,7 @@ body {
   color: #8e8e93;
 }
 
-/* ========== 右侧内容区 ========== */
+/* ========== 右侧内容区（更通透的毛玻璃） ========== */
 .main-content {
   width: 75%;
   padding: 2.5rem 3rem;
@@ -193,19 +191,19 @@ body {
 }
 
 .glass-panel {
-  background: var(--ios-card-bg);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   border-radius: var(--border-radius-card);
   padding: 2.5rem 2.8rem;
-  box-shadow: var(--ios-shadow-md);
-  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
   color: var(--ios-text);
   max-width: 780px;
   margin: 0 auto;
 }
 
-/* ========== 文章标题与元信息 ========== */
+/* ========== 文章标题与元信息（优化） ========== */
 .post-title, .page-title {
   font-size: 2.2rem;
   font-weight: 700;
@@ -225,7 +223,7 @@ body {
   gap: 0.5rem;
 }
 
-/* ========== 基础样式 ========== */
+/* ========== 通用元素美化 ========== */
 a {
   color: var(--ios-accent);
   text-decoration: none;
@@ -267,7 +265,7 @@ hr {
   letter-spacing: 0.3em;
 }
 
-/* ========== 移动端响应式布局 ========== */
+/* ========== 移动端响应式（优化） ========== */
 @media (max-width: 768px) {
   .app-container {
     flex-direction: column;
