@@ -391,20 +391,6 @@ body.dark {
   100% { transform: translateX(0); }
 }
 
-/* ========== 暗夜模式切换按钮 ========== */
-.theme-toggle {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.3rem;
-  margin-bottom: 1rem;
-  align-self: flex-end;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-.theme-toggle:hover { opacity: 1; }
-
 /* ========== 搜索框 ========== */
 .search-container {
   margin: 0 0 1.2rem 0;
@@ -529,4 +515,95 @@ body.dark::before {
 .tilt-text:hover {
   transform: rotate(-1.5deg);
   color: #b23a2e;  /* 可以换成你喜欢的强调色，比如朱砂红 */
+}
+.stats-toggle {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.7;
+  margin-top: 1rem;
+}
+.stats-panel {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: var(--ios-card-bg);
+  backdrop-filter: blur(30px);
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: var(--ios-shadow-md);
+  display: none;
+  z-index: 1000;
+  min-width: 200px;
+}
+.stats-panel.visible {
+  display: block;
+}
+.stats-header {
+  font-weight: 600;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  color: var(--ios-text);
+}
+.stats-body p {
+  font-size: 0.8rem;
+  margin: 0.3rem 0;
+  color: var(--ios-secondary);
+}
+.stats-body span {
+  color: var(--ios-text);
+  font-weight: 500;
+}
+/* ========== iOS 风格开关 ========== */
+.ios-toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  margin: 0 0 1rem auto;
+}
+
+.ios-toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ios-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #e9e9ea;
+  border-radius: 26px;
+  transition: 0.3s;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.ios-toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 2px;
+  bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.ios-toggle-input:checked + .ios-toggle-slider {
+  background: #34c759;
+}
+
+.ios-toggle-input:checked + .ios-toggle-slider::before {
+  transform: translateX(22px);
+}
+
+body.dark .ios-toggle-slider {
+  background: #636366;
+}
+body.dark .ios-toggle-input:checked + .ios-toggle-slider {
+  background: #34c759;
 }

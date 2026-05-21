@@ -9,17 +9,20 @@
   <script src="{{ '/assets/js/wordcount.js' | relative_url }}" defer></script>
   <script src="{{ '/assets/js/theme.js' | relative_url }}" defer></script>
   <script src="{{ '/assets/js/search.js' | relative_url }}" defer></script>
+  <script src="{{ '/assets/js/theme-transition.js' | relative_url }}" defer></script>
 </head>
 <body>
   <div class="app-container">
-    <!-- 左侧目录 -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <a href="{{ '/' | relative_url }}" class="site-title interactive-shine">{{ site.title }}</a>
       </div>
 
-      <!-- 暗夜模式切换按钮 -->
-      <button id="theme-toggle" class="theme-toggle interactive-shine" aria-label="切换深色模式">🌓</button>
+      <!-- iOS 风格暗夜模式开关 -->
+      <label class="ios-toggle">
+        <input type="checkbox" id="theme-toggle-checkbox" class="ios-toggle-input">
+        <span class="ios-toggle-slider"></span>
+      </label>
 
       <!-- 个人介绍卡片 -->
       <div class="profile-card">
