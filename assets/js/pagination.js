@@ -4,7 +4,6 @@
   if (!dataEl) return;
   
   const allPosts = JSON.parse(dataEl.textContent);
-  // 按置顶优先、日期倒序排序（日期越新越靠前）
   allPosts.sort((a, b) => {
     if (a.pin && !b.pin) return -1;
     if (!a.pin && b.pin) return 1;
@@ -12,9 +11,9 @@
   });
 
   let currentPage = 1;
-  let pinnedPosts = allPosts.filter(p => p.pin);
-  let normalPosts = allPosts.filter(p => !p.pin);
-  let totalPages = Math.ceil(normalPosts.length / postsPerPage);
+  const pinnedPosts = allPosts.filter(p => p.pin);
+  const normalPosts = allPosts.filter(p => !p.pin);
+  const totalPages = Math.ceil(normalPosts.length / postsPerPage);
 
   function renderPostCard(post) {
     const tagsHtml = post.tags.length > 0 
@@ -69,14 +68,9 @@
       return;
     }
     let html = `<span>第 ${currentPage} 页 / 共 ${totalPages} 页</span>`;
-    if (currentPage > 1) {
-      html += `<a href="#" class="page-link" data-page="${currentPage - 1}">上一页</a>`;
-    }
-    if (currentPage < totalPages) {
-      html += `<a href="#" class="page-link" data-page="${currentPage + 1}">下一页</a>`;
-    }
+    if (currentPage > 1) html += `<a href="#" class="page-link" data-page="${currentPage - 1}">上一页</a>`;
+    if (currentPage < totalPages) html += `<a href="#" class="page-link" data-page="${currentPage + 1}">下一页</a>`;
     container.innerHTML = html;
-
     document.querySelectorAll('.page-link').forEach(link => {
       link.addEventListener('click', e => {
         e.preventDefault();
@@ -90,7 +84,6 @@
     });
   }
 
-  // 启动
   renderPinned();
   renderPage(1);
 })();
