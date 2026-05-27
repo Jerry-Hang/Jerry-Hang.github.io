@@ -609,23 +609,32 @@ body.dark .ios-toggle-input:checked + .ios-toggle-slider {
 }
 /* 分页 */
 .pagination {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 0.9rem;
   display: flex;
-  gap: 1rem;
   justify-content: center;
   align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  font-size: 0.9rem;
 }
 .pagination a {
-  padding: 0.3rem 0.8rem;
+  padding: 0.4rem 1rem;
   background: rgba(255,255,255,0.5);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--ios-accent);
+  text-decoration: none;
+  transition: background 0.2s;
 }
 .pagination a:hover {
   background: rgba(255,255,255,0.7);
+}
+.pinned-section {
+  margin-bottom: 2rem;
+}
+.pinned-section h3 {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: var(--ios-secondary);
 }
 /* ========== 增强立体感 ========== */
 .glass-panel {

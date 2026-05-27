@@ -1,78 +1,96 @@
-(async function() {
+(function() {
   const postsPerPage = 12;
-  let allPosts = [];
-  let pinnedPosts = [];
-  let currentPage = 1;
-
-  // 从现有侧边栏胶囊数据获取文章信息（或者你可以在页面中通过模板输出 JSON）
-  // 这里我们采用更直接的方式：解析侧边栏中的胶囊数据来构建列表（仅限首页）
-  const sidebarCapsules = document.querySelectorAll('.post-capsule');
-  if (sidebarCapsules.length === 0) {
-    // 如果侧边栏没有胶囊（比如文章页），就不显示分页
-    return;
-  }
-
-  // 构建文章数据数组
-  sidebarCapsules.forEach(cap => {
-    const title = cap.querySelector('.capsule-title').textContent;
-    const excerpt = cap.querySelector('.capsule-excerpt')?.innerHTML || '';
-    const tags = cap.querySelector('.capsule-tags')?.innerHTML || '';
-    const meta = cap.querySelector('.capsule-meta')?.innerHTML || '';
-    const resume = cap.querySelector('.resume-link')?.outerHTML || '';
-    const url = cap.getAttribute('href');
-    const pin = cap.getAttribute('data-pin') === 'true'; // 可在胶囊上添加 data-pin 属性
-    const post = { title, excerpt, tags, meta, resume, url, pin };
-    if (pin) pinnedPosts.push(post);
-    else allPosts.push(post);
+  const dataEl = document.getElementById('post-data');
+  if (!dataEl) return;
+  
+  const allPosts = JSON.parse(dataEl.textContent);
+  // 按置顶优先、日期倒序排序（日期越新越靠前）
+  allPosts.sort((a, b) => {
+    if (a.pin && !b.pin) return -1;
+    if (!a.pin && b.pin) return 1;
+    return new Date(b.date) - new Date(a.date);
   });
 
-  // 合并：置顶在前，普通在后
-  const mergedPosts = [...pinnedPosts, ...allPosts];
-  const totalPages = Math.ceil(mergedPosts.length / postsPerPage);
+  let currentPage = 1;
+  let pinnedPosts = allPosts.filter(p => p.pin);
+  let normalPosts = allPosts.filter(p => !p.pin);
+  let totalPages = Math.ceil(normalPosts.length / postsPerPage);
 
-  function renderPosts(page) {
-    const start = (page - 1) * postsPerPage;
-    const end = start + postsPerPage;
-    const pagePosts = mergedPosts.slice(start, end);
-    const list = document.getElementById('post-list');
-    if (!list) return;
-    list.innerHTML = pagePosts.map(post => `
+  function renderPostCard(post) {
+    const tagsHtml = post.tags.length > 0 
+      ? `<div class="capsule-tags">${post.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` 
+      : '';
+    return `
       <li>
         <a href="${post.url}" class="post-capsule">
           <span class="capsule-title">${post.title}</span>
           <p class="capsule-excerpt">${post.excerpt}</p>
-          ${post.tags ? `<div class="capsule-tags">${post.tags}</div>` : ''}
-          <span class="capsule-meta">${post.meta}</span>
+          ${tagsHtml}
+          <span class="capsule-meta">
+            <time datetime="${post.date}">${post.date.slice(5)}</time>
+            <span class="meta-sep">·</span>
+            <span>${post.wordCount} 字</span>
+            <span class="meta-sep">·</span>
+            <span>${post.readingTime} 分钟</span>
+            <span class="meta-sep">·</span>
+            <span class="pageviews">-- 阅读</span>
+          </span>
           <span class="resume-link" data-post-url="${post.url}">↻ 继续阅读</span>
         </a>
       </li>
-    `).join('');
-    // 渲染分页导航
-    renderPagination(page, totalPages);
+    `;
   }
 
-  function renderPagination(current, total) {
+  function renderPinned() {
+    const container = document.getElementById('pinned-posts');
+    if (!container || pinnedPosts.length === 0) {
+      if (container) container.style.display = 'none';
+      return;
+    }
+    container.innerHTML = `
+      <h3>📌 置顶文章</h3>
+      <ul class="post-list">
+        ${pinnedPosts.map(post => renderPostCard(post)).join('')}
+      </ul>
+    `;
+  }
+
+  function renderPage(page) {
+    const start = (page - 1) * postsPerPage;
+    const pagePosts = normalPosts.slice(start, start + postsPerPage);
+    document.getElementById('post-list').innerHTML = pagePosts.map(renderPostCard).join('');
+    renderPagination();
+  }
+
+  function renderPagination() {
     const container = document.getElementById('pagination');
-    if (!container) return;
-    let html = '';
-    html += `<span>第 ${current} 页 / 共 ${total} 页</span>`;
-    if (current > 1) html += `<a href="#" class="page-link" data-page="${current-1}">上一页</a>`;
-    if (current < total) html += `<a href="#" class="page-link" data-page="${current+1}">下一页</a>`;
+    if (!container || totalPages <= 1) {
+      if (container) container.innerHTML = '';
+      return;
+    }
+    let html = `<span>第 ${currentPage} 页 / 共 ${totalPages} 页</span>`;
+    if (currentPage > 1) {
+      html += `<a href="#" class="page-link" data-page="${currentPage - 1}">上一页</a>`;
+    }
+    if (currentPage < totalPages) {
+      html += `<a href="#" class="page-link" data-page="${currentPage + 1}">下一页</a>`;
+    }
     container.innerHTML = html;
 
-    // 绑定点击事件
     document.querySelectorAll('.page-link').forEach(link => {
       link.addEventListener('click', e => {
         e.preventDefault();
-        const page = parseInt(link.dataset.page);
-        if (page >= 1 && page <= total) {
-          currentPage = page;
-          renderPosts(page);
+        const p = parseInt(link.dataset.page);
+        if (p >= 1 && p <= totalPages) {
+          currentPage = p;
+          renderPage(p);
+          document.getElementById('post-list-container').scrollIntoView({ behavior: 'smooth' });
         }
       });
     });
   }
 
-  // 初始渲染第1页
-  renderPosts(currentPage);
+  // 启动
+  renderPinned();
+  renderPage(1);
 })();
