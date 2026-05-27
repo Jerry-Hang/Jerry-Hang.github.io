@@ -607,3 +607,44 @@ body.dark .ios-toggle-slider {
 body.dark .ios-toggle-input:checked + .ios-toggle-slider {
   background: #34c759;
 }
+/* 分页 */
+.pagination {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+}
+.pagination a {
+  padding: 0.3rem 0.8rem;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  color: var(--ios-accent);
+}
+.pagination a:hover {
+  background: rgba(255,255,255,0.7);
+}
+/* ========== 增强立体感 ========== */
+.glass-panel {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.post-capsule {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.profile-link {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+.search-input {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04), inset 0 1px 2px rgba(255,255,255,0.6);
+}
+.site-title, .capsule-title, .post-title {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+/* 暗夜模式下也适配 */
+body.dark .glass-panel {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+/* 其他类似... */

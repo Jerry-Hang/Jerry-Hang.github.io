@@ -10,9 +10,11 @@
   <script src="{{ '/assets/js/theme.js' | relative_url }}" defer></script>
   <script src="{{ '/assets/js/search.js' | relative_url }}" defer></script>
   <script src="{{ '/assets/js/theme-transition.js' | relative_url }}" defer></script>
+  <script src="{{ '/assets/js/pagination.js' | relative_url }}" defer></script>
 </head>
 <body>
   <div class="app-container">
+    <!-- 左侧目录 -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <a href="{{ '/' | relative_url }}" class="site-title interactive-shine">{{ site.title }}</a>
@@ -37,8 +39,8 @@
         </a>
       </div>
 
-      <!-- 搜索框 -->
-      <div class="search-container">
+      <!-- 搜索框（带交互 shine） -->
+      <div class="search-container interactive-shine">
         <input type="text" id="post-search" class="search-input" placeholder="搜索文章标题或内容..." autocomplete="off">
       </div>
 
@@ -46,7 +48,7 @@
         <ul class="post-nav-list">
           {% for post in site.posts %}
             <li>
-              <a href="{{ post.url | relative_url }}" class="post-capsule {% if page.url == post.url %}active{% endif %}">
+              <a href="{{ post.url | relative_url }}" class="post-capsule {% if page.url == post.url %}active{% endif %}" {% if post.pin %}data-pin="true"{% endif %}>
                 <span class="capsule-title">{{ post.title }}</span>
                 <p class="capsule-excerpt">{{ post.excerpt | default: post.content | strip_html | truncate: 60 }}</p>
                 {% if post.tags %}

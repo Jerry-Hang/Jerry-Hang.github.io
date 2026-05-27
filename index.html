@@ -4,4 +4,11 @@ title: 首页
 ---
 
 <h2>👋 欢迎来到我的小站</h2>
-<p>在这里记录一些技术折腾和生活碎片。在左侧目录中选择文章开始阅读。</p>
+<p>这里是最新文章列表。</p>
+
+<div id="post-list-container">
+  <ul class="post-list" id="post-list"></ul>
+</div>
+<div id="pagination" class="pagination"></div>
+
+<script src="{{ '/assets/js/pagination.js' | relative_url }}"></script>
