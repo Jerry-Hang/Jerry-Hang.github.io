@@ -434,7 +434,7 @@ function openAbout() {
           '</div>' +
         '</div>' +
         '<p style="margin-top:18px;font-size:12px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 赛博修仙，从记录开始</p>';
-      const stats = document.getElementById("about-stats");
+      const stats = body.querySelector(".stat-grid");
       if (stats) {
         const tags = allTags().length;
         const cats = allCategories().length - 1;
