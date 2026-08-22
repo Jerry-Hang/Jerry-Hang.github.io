@@ -1,1 +1,92 @@
-<h1>Jerry 的赛博博客</h1>
+---
+---
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ site.title }}</title>
+  <meta name="description" content="{{ site.description }}">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      padding: 5rem 1.5rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1e1b4b;
+      background: linear-gradient(135deg, #ede9fe 0%, #dbeafe 50%, #e0e7ff 100%);
+      background-attachment: fixed;
+    }
+    .blob { position: fixed; border-radius: 9999px; filter: blur(90px); opacity: .55; pointer-events: none; z-index: -1; }
+    .blob-1 { width: 420px; height: 420px; top: -90px; left: -90px; background: #a5b4fc; }
+    .blob-2 { width: 520px; height: 520px; top: 34%; right: -150px; background: #c4b5fd; }
+    .blob-3 { width: 380px; height: 380px; bottom: -70px; left: 22%; background: #93c5fd; }
+
+    /* Win11 毛玻璃卡片 */
+    .glass {
+      background: rgba(255, 255, 255, .2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, .5);
+      border-radius: 1rem; /* rounded-2xl */
+      box-shadow: 0 8px 32px rgba(31, 38, 135, .08);
+      padding: 1.75rem;
+      transition: transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s ease, background-color .35s ease, border-color .35s ease;
+    }
+    .glass:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 18px 48px rgba(31, 38, 135, .18);
+      background-color: rgba(255, 255, 255, .32);
+      border-color: rgba(255, 255, 255, .8);
+    }
+
+    .hero-title { font-size: clamp(2.5rem, 7vw, 4.25rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.05; }
+    .card-title { transition: color .3s ease; }
+    .glass:hover .card-title { color: #6d28d9; }
+    .muted { opacity: .68; }
+
+    /* 暗黑模式：切换背景与文字颜色 */
+    @media (prefers-color-scheme: dark) {
+      body { color: #e5e7eb; background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #0f172a 100%); }
+      .blob-1 { background: #4c1d95; opacity: .32; }
+      .blob-2 { background: #312e81; opacity: .32; }
+      .blob-3 { background: #0e7490; opacity: .32; }
+      .glass { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .12); box-shadow: 0 8px 32px rgba(0, 0, 0, .35); }
+      .glass:hover { background: rgba(255, 255, 255, .13); border-color: rgba(255, 255, 255, .24); box-shadow: 0 18px 48px rgba(0, 0, 0, .5); }
+      .glass:hover .card-title { color: #a5b4fc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <main class="mx-auto max-w-3xl">
+    <header class="mb-12">
+      <h1 class="hero-title">{{ site.title }}</h1>
+      <p class="muted mt-4 text-lg">{{ site.description }}</p>
+    </header>
+
+    <section class="space-y-6">
+      {% for post in site.posts %}
+        <article class="glass group cursor-pointer">
+          <a href="{{ post.url }}" class="block">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 class="card-title text-xl font-bold md:text-2xl">{{ post.title }}</h2>
+              <time class="muted shrink-0 text-sm tabular-nums">{{ post.date | date: "%Y-%m-%d" }}</time>
+            </div>
+            <p class="muted mt-3 truncate text-[15px] leading-relaxed">{{ post.excerpt | strip_html | truncate: 110 }}</p>
+          </a>
+        </article>
+      {% endfor %}
+    </section>
+
+    <footer class="muted mt-16 text-center text-sm">
+      © {{ site.time | date: "%Y" }} {{ site.title }} · 共 {{ site.posts.size }} 篇文章
+    </footer>
+  </main>
+</body>
+</html>
