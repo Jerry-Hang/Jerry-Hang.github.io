@@ -132,20 +132,34 @@ fn cmd_push(message: &str) {
         std::process::exit(1);
     }
 
-    println!("==> git push");
-    let (ok, out) = git_output(&["push"]);
-    if !ok {
-        // 首次推送时还没有 upstream 分支，自动补一次 git push -u origin <分支>
-        if out.contains("upstream") {
-            if let Some(branch) = current_branch() {
-                println!("==> 检测到首次推送，自动设置 upstream: git push -u origin {branch}");
-                if git_output(&["push", "-u", "origin", &branch]).0 {
-                    println!("✔ 已成功推送到远程仓库。");
-                    return;
-                }
-            }
+    // 首次推送（尚无 upstream）时自动补 -u origin <当前分支>
+    let branch = current_branch();
+    let push_args: Vec<String>;
+    let desc: String;
+    if let Some(b) = &branch {
+        if !has_upstream() {
+            push_args = vec![
+                "push".to_string(),
+                "-u".to_string(),
+                "origin".to_string(),
+                b.clone(),
+            ];
+            desc = format!("git push -u origin {b}");
+        } else {
+            push_args = vec!["push".to_string()];
+            desc = "git push".to_string();
         }
-        eprintln!("✘ git push 失败，请检查远程地址与认证配置。");
+    } else {
+        push_args = vec!["push".to_string()];
+        desc = "git push".to_string();
+    }
+    println!("==> {desc}");
+
+    // push 使用继承的 stdin/stdout/stderr 运行：
+    // 第一次推送时 git 才能在终端交互式提示输入 GitHub 用户名和 PAT。
+    let arg_refs: Vec<&str> = push_args.iter().map(String::as_str).collect();
+    if !run_git_interactive(&arg_refs) {
+        eprintln!("✘ git push 失败，请检查远程地址与认证配置（见上方 git 输出）。");
         std::process::exit(1);
     }
 
@@ -195,6 +209,26 @@ fn current_branch() -> Option<String> {
         }
     }
     None
+}
+
+/// 当前分支是否已设置 upstream（跟踪远程分支）
+fn has_upstream() -> bool {
+    Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// 以继承的 stdio 运行 git（用于 push：允许 git 在终端交互式提示输入凭证）
+fn run_git_interactive(args: &[&str]) -> bool {
+    match Command::new("git").args(args).status() {
+        Ok(st) => st.success(),
+        Err(e) => {
+            eprintln!("无法执行 git: {e}（请确认已安装 git）");
+            false
+        }
+    }
 }
 
 /// 取今天日期 (年, 月, 日)。
