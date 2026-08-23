@@ -93,6 +93,75 @@ fn cmd_new(title: &str) {
     println!("  用编辑器打开它开始写作吧。");
 }
 
+
+/// RSS 2.0 feed（订阅用）
+fn build_feed(posts: &[Post]) -> String {
+    let mut items = String::new();
+    for (i, p) in posts.iter().enumerate() {
+        items.push_str(&format!(
+            "  <item><title>{t}</title><link>https://jerry-hang.blog/</link><guid isPermaLink=\"false\">jb-{i}-{d}-{t}</guid><pubDate>{pub}</pubDate><description>{dsc}</description></item>\n",
+            t = xml_escape(&p.title),
+            i = i,
+            d = xml_escape(&p.date),
+            pub = rfc822_date(&p.date),
+            dsc = xml_escape(&p.desc),
+        ));
+    }
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\"><channel>\n<title>{t}</title><link>https://jerry-hang.blog</link><description>{d}</description><language>zh-cn</language>\n{items}</channel></rss>",
+        t = xml_escape("Jerry 的赛博博客"),
+        d = xml_escape("记录赛博修仙日常"),
+        items = items,
+    )
+}
+
+/// XML 转义
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    for ch in s.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// YYYY-MM-DD -> RFC822（GMT）
+fn rfc822_date(date_str: &str) -> String {
+    let parts: Vec<&str> = date_str.split('-').collect();
+    if parts.len() == 3 {
+        if let (Ok(y), Ok(m), Ok(d)) = (
+            parts[0].parse::<i64>(),
+            parts[1].parse::<u32>(),
+            parts[2].parse::<u32>(),
+        ) {
+            if (1..=12).contains(&m) && (1..=31).contains(&d) {
+                let days = days_from_civil(y, m, d);
+                let weekdays = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+                let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                let wd = weekdays[(((days % 7) + 7) % 7) as usize];
+                let mm = months[(m - 1) as usize];
+                return format!("{wd}, {d:02} {mm} {y} 00:00:00 GMT");
+            }
+        }
+    }
+    format!("{date_str} 00:00:00 GMT")
+}
+
+fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = y - i64::from(m <= 2);
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = (i64::from(m) + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + i64::from(d) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
+}
+
 /// 列出所有 Markdown 文章
 fn cmd_list() {
     let dir = Path::new(POSTS_DIR);
@@ -148,6 +217,7 @@ fn cmd_build() {
         .collect();
 
     let out = format!("[{}]", items.join(","));
+    fs::write("feed.xml", build_feed(&posts)).expect("写入 feed.xml 失败");
     fs::write("posts.json", out).expect("写入 posts.json 失败");
     println!("✔ 已生成 posts.json（{} 篇文章）", posts.len());
 }

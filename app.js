@@ -151,6 +151,31 @@ function pinnedPosts() {
   const ps = state.posts.filter(p => p.pinned);
   return ps.length ? ps : state.posts.slice(0, 4);
 }
+function readMinutes(p) {
+  const words = (p.body || "").replace(/\s/g, "").length;
+  return Math.max(1, Math.round(words / 420));
+}
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+}
+function copyPageLink() {
+  const url = location.origin + location.pathname;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => showToast("链接已复制")).catch(() => showToast("复制失败"));
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); showToast("链接已复制"); } catch (e) { showToast("复制失败"); }
+    ta.remove();
+  }
+}
 
 /* ---------- 侧栏 ---------- */
 function toggleSidebar(force) {
@@ -251,6 +276,7 @@ function showView(name) {
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  state.nav = name;
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -288,7 +314,7 @@ function renderHome() {
           '<span class="hi-title">' + esc(p.title) + '</span>' +
           (p.desc ? '<span class="hi-excerpt">' + esc(p.desc) + '</span>' : '') +
         '</span>' +
-        '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></span>' +
+        '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字 · ' + readMinutes(p) + ' 分钟</span></span>' +
         '<span class="hi-arrow">›</span>' +
       '</button>';
     }).join("");
@@ -325,7 +351,8 @@ function openArticle(idx) {
   document.getElementById("r-meta").innerHTML =
     '<span>' + esc(p.date || "") + '</span>' +
     '<span>' + esc(SITE.author) + '</span>' +
-    '<span>' + esc((p.body || "").length) + ' 字</span>';
+    '<span>' + esc((p.body || "").length) + ' 字</span>' +
+    '<span>约 ' + readMinutes(p) + ' 分钟</span>';
   const mdBody = document.getElementById("r-body");
   mdBody.innerHTML = mdToHtml(p.body);
   const outline = [];
@@ -338,8 +365,10 @@ function openArticle(idx) {
   const next = state.posts[idx + 1];
   document.getElementById("r-foot").innerHTML =
     '<button class="pn-btn' + (prev ? "" : " disabled") + '" id="r-prev">‹ ' + (prev ? esc(prev.title) : "已是最早") + '</button>' +
-    '<button class="pn-btn" id="r-back">返回精选</button>' +
+    '<button class="pn-btn" id="r-back">返回</button>' +
+    '<button class="pn-btn" id="r-copy">复制链接</button>' +
     '<button class="pn-btn' + (next ? "" : " disabled") + '" id="r-next">' + (next ? esc(next.title) : "已是最新") + ' ›</button>';
+  document.getElementById("r-copy").addEventListener("click", copyPageLink);
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
   if (next) document.getElementById("r-next").addEventListener("click", () => selectArticle(idx + 1));
   document.getElementById("r-back").addEventListener("click", () => showView("home"));
@@ -396,7 +425,13 @@ function renderAbout() {
     '</p>' +
     '<div class="a-links">' +
       '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">GitHub 仓库</a>' +
+      '<a class="link-btn" href="feed.xml" target="_blank" rel="noopener">RSS 订阅</a>' +
       '<a class="link-btn" href="mailto:jerry@example.com">联系我</a>' +
+    '</div>' +
+    '<div class="sect" style="margin-top:16px;"><h3 style="font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">参考与友链</h3>' +
+      '<div class="a-links">' +
+        '<a class="link-btn" href="https://github.com/Eric-Terminal/cf-astro-blog" target="_blank" rel="noopener">cf-astro-blog 参考项目</a>' +
+      '</div>' +
     '</div>' +
     '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 赛博修仙，从记录开始</p>';
 }
@@ -446,9 +481,26 @@ $$("#tb-tabs button").forEach(b => b.addEventListener("click", () => {
   else showView("about");
 }));
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && window.innerWidth <= 720) toggleSidebar(false);
+  if (e.key === "Escape") { toggleSidebar(false); return; }
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (state.nav === "reader" && state.articleIdx >= 0) {
+    if (e.key === "ArrowLeft" && state.articleIdx > 0) selectArticle(state.articleIdx - 1);
+    if (e.key === "ArrowRight" && state.articleIdx < state.posts.length - 1) selectArticle(state.articleIdx + 1);
+  }
 });
 window.addEventListener("resize", () => { renderHome(); });
+
+/* 返回顶部 */
+(function() {
+  const btn = document.getElementById("back-top");
+  let show = false;
+  window.addEventListener("scroll", () => {
+    const s = window.scrollY > 480;
+    if (s !== show) { show = s; btn.classList.toggle("show", s); }
+  }, { passive: true });
+  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+})();
 
 /* 滚动收缩：顶部横条 → 悬浮胶囊（平滑过渡） */
 (function() {
