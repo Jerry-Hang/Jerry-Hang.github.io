@@ -3,4 +3,12 @@ name = "blog_ctl"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "blog_ctl"
+path = "src/main.rs"
+
+[[bin]]
+name = "blog_hub"
+path = "src/bin/blog_hub.rs"
+
 [dependencies]
