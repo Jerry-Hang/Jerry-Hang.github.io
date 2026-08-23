@@ -160,7 +160,6 @@ function toggleSidebar(force) {
   } else {
     const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
     document.getElementById("layout").classList.toggle("side-open", open);
-    document.getElementById("tb-side-label").textContent = open ? "收起" : "目录";
   }
 }
 function renderChips() {
@@ -362,7 +361,7 @@ document.getElementById("side-grip").addEventListener("click", () => toggleSideb
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
 document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderPills(); });
-$$(".tb-nav button").forEach(b => b.addEventListener("click", () => {
+$$(".tabbar button").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.nav === "home") showView("home");
   else if (b.dataset.nav === "archive") showView("archive");
   else showView("about");
