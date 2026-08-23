@@ -13,15 +13,17 @@ const SITE = { title: "Jerry 的赛博博客", author: "Jerry", repo: "https://g
 
 const WALLS = [
   { id: "clean", name: "纯色", img: "" },
+  { id: "skull", name: "花海", img: "assets/skull.jpg" },
   { id: "arch", name: "樱", img: "assets/arch.jpg" },
-  { id: "avatar3", name: "红伞", img: "assets/avatar3.jpg" },
-  { id: "banner", name: "草地", img: "assets/banner.jpg" },
-  { id: "skull", name: "花海", img: "assets/skull.jpg" }
+  { id: "banner", name: "草地", img: "assets/banner.jpg" }
 ];
+
+let storedWall = localStorage.getItem("jb_wall");
+if (storedWall === "avatar3") { storedWall = ""; localStorage.removeItem("jb_wall"); }
 
 const state = {
   theme: localStorage.getItem("jb_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
-  wall: localStorage.getItem("jb_wall") || (matchMedia("(prefers-color-scheme: dark)").matches ? "avatar3" : "arch"),
+  wall: storedWall || "skull",
   posts: [],
   q: "",
   sideMode: "cat",
