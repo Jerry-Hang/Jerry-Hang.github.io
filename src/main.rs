@@ -24,6 +24,7 @@ struct Post {
     tags: Vec<String>,
     desc: String,
     body: String,
+    pinned: bool,
 }
 
 fn main() {
@@ -134,13 +135,14 @@ fn cmd_build() {
         .iter()
         .map(|p| {
             format!(
-                "{{\"title\":\"{t}\",\"date\":\"{d}\",\"categories\":[{c}],\"tags\":[{g}],\"desc\":\"{e}\",\"body\":\"{b}\"}}",
+                "{{\"title\":\"{t}\",\"date\":\"{d}\",\"categories\":[{c}],\"tags\":[{g}],\"desc\":\"{e}\",\"body\":\"{b}\",\"pinned\":{p}}}",
                 t = json_escape(&p.title),
                 d = json_escape(&p.date),
                 c = json_str_array(&p.categories),
                 g = json_str_array(&p.tags),
                 e = json_escape(&p.desc),
                 b = json_escape(&p.body),
+                p = if p.pinned { "true" } else { "false" },
             )
         })
         .collect();
@@ -185,6 +187,7 @@ fn parse_post(path: &Path) -> Option<Post> {
     let mut categories = Vec::new();
     let mut tags = Vec::new();
     let mut desc = String::new();
+    let mut pinned = false;
     let mut body_start = 0usize;
 
     if lines.first().map(|l| l.trim()) == Some("---") {
@@ -204,6 +207,7 @@ fn parse_post(path: &Path) -> Option<Post> {
                     "categories" => categories = parse_list(val),
                     "tags" => tags = parse_list(val),
                     "desc" | "description" => desc = unquote(val),
+                    "pinned" => pinned = unquote(val) == "true",
                     _ => {}
                 }
             }
@@ -255,7 +259,7 @@ fn parse_post(path: &Path) -> Option<Post> {
         }
     }
 
-    Some(Post { title, date, categories, tags, desc, body })
+    Some(Post { title, date, categories, tags, desc, body, pinned })
 }
 
 /// 去掉包裹的引号
