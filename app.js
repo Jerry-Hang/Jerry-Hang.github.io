@@ -214,7 +214,7 @@ function showView(name) {
 }
 function selectArticle(idx) {
   state.articleIdx = idx;
-  renderPills();
+  Array.from(document.querySelectorAll(".pill")).forEach(p => p.classList.toggle("selected", Number(p.dataset.idx) === idx));
   openArticle(idx);
   showView("reader");
 }
@@ -384,5 +384,6 @@ window.addEventListener("resize", () => { renderHome(); });
 (function init() {
   applyTheme();
   toggleSidebar(false);
+  showView("home");
   loadPosts();
 })();

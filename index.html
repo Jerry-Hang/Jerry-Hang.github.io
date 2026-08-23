@@ -151,26 +151,12 @@ body.dark #tb-theme .i-sun { display: block; }
 /* 收起态把手 */
 #side-grip {
   position: absolute; inset: 0; z-index: 5;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  padding-top: 24px;
-  writing-mode: vertical-rl; letter-spacing: .5em;
-  font-size: 12px; font-weight: 500; color: var(--text-faint);
   background: inherit;
-  transition: opacity .2s ease, color .2s ease;
+  cursor: pointer;
+  transition: background-color .22s ease;
 }
 #layout.side-open #side-grip { opacity: 0; pointer-events: none; }
-#side-grip { cursor: pointer; }
-#side-grip:hover { color: var(--accent); background: var(--accent-soft); }
-#side-grip::after {
-  content: ""; position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
-  width: 30px; height: 30px; border-radius: 999px;
-  background-color: var(--card);
-  border: 1px solid var(--card-border);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007aff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E");
-  background-position: center; background-repeat: no-repeat; background-size: 13px;
-  transition: transform .2s ease, background-color .2s ease;
-}
-#side-grip:hover::after { transform: translateX(-50%) translateY(-2px); background-color: var(--accent-soft); }
+#side-grip:hover { background-color: var(--accent-soft); }
 
 /* 侧栏面板 */
 #side-panel { display: flex; flex-direction: column; height: 100%; width: 100%; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
@@ -393,8 +379,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
     height: calc(100vh - 98px - 18px);
   }
   #layout.side-open #sidebar { flex-basis: 40%; }
-  #side-grip { padding-top: 16px; font-size: 11px; letter-spacing: .3em; }
-  #side-grip::after { width: 26px; height: 26px; bottom: 14px; background-size: 11px; }
+  #side-grip { border-radius: 18px; }
   .side-head { padding: 10px 10px 8px; }
   .side-head-top { padding: 0 2px 8px; }
   .side-chips { padding: 0 10px 6px; }
@@ -444,7 +429,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 
 <div id="layout">
   <aside id="sidebar">
-    <div id="side-grip">目录</div>
+    <div id="side-grip" aria-label="展开目录" role="button"></div>
     <div id="side-panel">
       <div class="side-head">
         <div class="side-head-top">
