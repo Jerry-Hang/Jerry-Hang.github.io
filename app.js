@@ -155,6 +155,7 @@ async function loadPosts() {
     state.posts = [];
   }
   renderAll();
+  openFromHashIfAny();
 }
 function allCats() {
   const s = new Set(["全部"]);
@@ -190,7 +191,7 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
 }
 function copyPageLink() {
-  const url = location.origin + location.pathname;
+  const url = location.origin + location.pathname + (location.hash || "");
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => showToast("链接已复制")).catch(() => showToast("复制失败"));
   } else {
@@ -343,6 +344,7 @@ function renderSide() {
 /* ---------- 视图 ---------- */
 function showView(name) {
   const doIt = () => {
+    if (name !== "reader") { try { history.replaceState(null, "", "#/"); } catch (e) { /* 忽略 */ } }
     $$(".view").forEach(v => v.classList.remove("on"));
     const v = document.getElementById("view-" + name);
     if (v) v.classList.add("on");
@@ -358,9 +360,15 @@ function showView(name) {
   }
   doIt();
 }
+function articleHash(p) {
+  const key = encodeURIComponent(p.slug || p.title || "");
+  return "#/post/" + key;
+}
 function selectArticle(idx) {
+  const p = state.posts[idx];
+  if (!p) return;
   state.articleIdx = idx;
-  Array.from(document.querySelectorAll(".pill")).forEach(p => p.classList.toggle("selected", Number(p.dataset.idx) === idx));
+  Array.from(document.querySelectorAll(".pill")).forEach(p2 => p2.classList.toggle("selected", Number(p2.dataset.idx) === idx));
   openArticle(idx);
   showView("reader");
   state.sideView = "outline";
@@ -368,6 +376,7 @@ function selectArticle(idx) {
   if (sb) { sb.value = ""; sb.placeholder = "搜索本文…"; }
   toggleSidebar(false);
   renderSide();
+  try { history.replaceState(null, "", articleHash(p)); } catch (e) { /* 忽略 */ }
 }
 
 /* ---------- 主页文章长条 3/4 + 翻页 ---------- */
@@ -640,6 +649,25 @@ document.addEventListener("keydown", e => {
   }
 });
 window.addEventListener("resize", () => { renderHome(); });
+
+/* hash 路由：直链打开文章 / 回主页 */
+window.addEventListener("hashchange", () => {
+  const m = (location.hash || "").match(/^#\/post\/(.+)$/);
+  if (m) {
+    const key = decodeURIComponent(m[1]);
+    const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
+    if (idx >= 0) selectArticle(idx); else showView("home");
+  } else {
+    if (state.nav !== "home") showView("home");
+  }
+});
+function openFromHashIfAny() {
+  const m = (location.hash || "").match(/^#\/post\/(.+)$/);
+  if (!m) return;
+  const key = decodeURIComponent(m[1]);
+  const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
+  if (idx >= 0) selectArticle(idx);
+}
 
 /* 返回顶部 + 阅读进度 */
 (function() {
