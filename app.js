@@ -15,7 +15,9 @@ const state = {
   theme: localStorage.getItem("jb_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   posts: [],
   q: "",
-  cat: "全部",
+  sideMode: "cat",
+  sideView: "posts",
+  outline: [],
   articleIdx: -1,
   pinnedPage: 1
 };
@@ -135,9 +137,7 @@ function allCats() {
 }
 function filteredPosts() {
   const q = state.q.trim().toLowerCase();
-  const cat = state.cat;
   let list = state.posts.slice();
-  if (cat !== "全部") list = list.filter(p => (p.categories || []).includes(cat));
   if (q) list = list.filter(p =>
     (p.title || "").toLowerCase().includes(q) ||
     (p.tags || []).some(t => t.toLowerCase().includes(q)) ||
@@ -157,41 +157,41 @@ function toggleSidebar(force) {
   const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
   document.getElementById("layout").classList.toggle("side-open", open);
 }
-function renderChips() {
-  const box = document.getElementById("side-chips");
-  const cats = allCats();
-  box.innerHTML = cats.map(c =>
-    '<button class="chip' + (c === state.cat ? " on" : "") + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>'
+function renderModes() {
+  const box = document.getElementById("side-modes");
+  const modes = [["cat", "分类"], ["tag", "标签"], ["pin", "精选"]];
+  box.innerHTML = modes.map(m =>
+    '<button class="mode' + (state.sideMode === m[0] ? " on" : "") + '" data-mode="' + m[0] + '">' + m[1] + '</button>'
   ).join("");
-  $$("#side-chips .chip").forEach(b => b.addEventListener("click", () => {
-    state.cat = b.dataset.cat;
-    renderChips();
-    renderPills();
+  $$("#side-modes .mode").forEach(b => b.addEventListener("click", () => {
+    state.sideMode = b.dataset.mode;
+    renderSide();
   }));
 }
-function renderPills() {
-  const list = filteredPosts();
-  const box = document.getElementById("post-scroll");
-  document.getElementById("side-count").textContent = list.length + " 篇";
-  if (!list.length) {
-    box.innerHTML = '<div class="empty-tip">没有匹配的文章</div>';
-    return;
-  }
-  box.innerHTML = '<div class="pill-grid">' + list.map(p => {
-    const idx = state.posts.indexOf(p);
-    const sel = idx === state.articleIdx ? " selected" : "";
-    const words = (p.body || "").replace(/\s/g, "").length;
-    const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
-    return '<div class="pill-wrap">' +
-      '<button class="pill' + sel + '" data-idx="' + idx + '">' +
-        '<span class="p-date">' + esc(p.date || "") + '</span>' +
-        '<span class="p-title">' + esc(p.title) + '</span>' +
-        '<div class="p-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></div>' +
-      '</button>' +
-    '</div>';
-  }).join("") + '</div>';
-
-  $$("#post-scroll .pill").forEach(btn => {
+function pillHtml(p) {
+  const idx = state.posts.indexOf(p);
+  const sel = idx === state.articleIdx ? " selected" : "";
+  const words = (p.body || "").replace(/\s/g, "").length;
+  const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
+  return '<div class="pill-wrap">' +
+    '<button class="pill' + sel + '" data-idx="' + idx + '">' +
+      '<span class="p-date">' + esc(p.date || "") + '</span>' +
+      '<span class="p-title">' + esc(p.title) + '</span>' +
+      '<div class="p-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></div>' +
+    '</button>' +
+  '</div>';
+}
+function groupsBy(list, keyFn) {
+  const groups = {};
+  list.forEach(p => {
+    const keys = keyFn(p);
+    const list2 = (keys && keys.length) ? keys : ["未分类"];
+    list2.forEach(k => { (groups[k] = groups[k] || []).push(p); });
+  });
+  return groups;
+}
+function bindPillEvents(scope) {
+  $$(".pill", scope).forEach(btn => {
     btn.addEventListener("click", () => selectArticle(Number(btn.dataset.idx)));
     let tmr = null;
     const press = () => { tmr = setTimeout(() => btn.classList.add("pressing"), 380); };
@@ -201,6 +201,48 @@ function renderPills() {
     btn.addEventListener("pointerleave", release);
     btn.addEventListener("pointercancel", release);
   });
+  if (window.bindTilt) window.bindTilt(scope);
+}
+function renderOutlineInto(box) {
+  const hands = state.outline;
+  if (!hands.length) { box.innerHTML = '<div class="outline-empty">本篇没有标题分节</div>'; return; }
+  box.innerHTML = '<div class="group-head">文章摘要</div>' + hands.map(o =>
+    '<button class="outline-item lv' + o.level + '" data-target="' + o.id + '">' + esc(o.text) + '</button>'
+  ).join("");
+  let cnt = 0;
+  $$(".outline-item", box).forEach(b => b.addEventListener("click", () => {
+    const el = document.getElementById(b.dataset.target);
+    if (!el) return;
+    if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1700);
+    cnt++;
+  }));
+}
+function renderSide() {
+  renderModes();
+  const box = document.getElementById("post-scroll");
+  if (state.sideView === "outline") { renderOutlineInto(box); return; }
+  const list = filteredPosts();
+  document.getElementById("side-count").textContent = list.length + " 篇";
+  if (!list.length) { box.innerHTML = '<div class="empty-tip">没有匹配的文章</div>'; return; }
+  let html = "";
+  if (state.sideMode === "pin") {
+    const pinned = list.filter(p => p.pinned);
+    html = pinned.length ? '<div class="pill-grid">' + pinned.map(pillHtml).join("") + '</div>' : '<div class="empty-tip">暂无精选文章</div>';
+  } else if (state.sideMode === "tag") {
+    const groups = groupsBy(list, p => p.tags);
+    html = Object.keys(groups).map(k =>
+      '<div class="group-head">' + esc(k) + '</div><div class="pill-grid">' + groups[k].map(pillHtml).join("") + '</div>'
+    ).join("");
+  } else {
+    const groups = groupsBy(list, p => p.categories);
+    html = Object.keys(groups).map(k =>
+      '<div class="group-head">' + esc(k) + '</div><div class="pill-grid">' + groups[k].map(pillHtml).join("") + '</div>'
+    ).join("");
+  }
+  box.innerHTML = html;
+  bindPillEvents(box);
 }
 
 /* ---------- 视图 ---------- */
@@ -209,6 +251,7 @@ function showView(name) {
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
   $$(".tabbar button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -217,6 +260,9 @@ function selectArticle(idx) {
   Array.from(document.querySelectorAll(".pill")).forEach(p => p.classList.toggle("selected", Number(p.dataset.idx) === idx));
   openArticle(idx);
   showView("reader");
+  state.sideView = "outline";
+  toggleSidebar(false);
+  renderSide();
 }
 
 /* ---------- 精选 + 翻页 ---------- */
@@ -276,7 +322,14 @@ function openArticle(idx) {
     '<span>' + esc(p.date || "") + '</span>' +
     '<span>' + esc(SITE.author) + '</span>' +
     '<span>' + esc((p.body || "").length) + ' 字</span>';
-  document.getElementById("r-body").innerHTML = mdToHtml(p.body);
+  const mdBody = document.getElementById("r-body");
+  mdBody.innerHTML = mdToHtml(p.body);
+  const outline = [];
+  mdBody.querySelectorAll("h1,h2,h3").forEach((h, i) => {
+    h.id = "sec-" + i;
+    outline.push({ id: "sec-" + i, level: Number(h.tagName[1]), text: h.textContent.trim() });
+  });
+  state.outline = outline;
   const prev = state.posts[idx - 1];
   const next = state.posts[idx + 1];
   document.getElementById("r-foot").innerHTML =
@@ -344,10 +397,34 @@ function renderAbout() {
     '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 赛博修仙，从记录开始</p>';
 }
 
+/* ---------- 3D tilt（仅精细指针设备） ---------- */
+(function() {
+  const fine = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+  function attach(root) {
+    if (!fine) return;
+    (root || document).querySelectorAll(".pill:not([data-tilt]), .pin-card:not([data-tilt])").forEach(el => {
+      el.setAttribute("data-tilt", "1");
+      el.addEventListener("mousemove", e => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        el.style.transform = "perspective(700px) rotateX(" + (-py * 7).toFixed(2) + "deg) rotateY(" + (px * 9).toFixed(2) + "deg) translateY(-2px)";
+        try {
+          el.style.setProperty("--mx", (px * 100 + 50).toFixed(1) + "%");
+          el.style.setProperty("--my", (py * 100 + 50).toFixed(1) + "%");
+        } catch (err) { /* 自定义属性在个别环境受限 */ }
+      });
+      el.addEventListener("mouseleave", () => { el.style.transform = ""; });
+    });
+  }
+  window.bindTilt = attach;
+  attach();
+})();
+
 /* ---------- 总渲染 ---------- */
 function renderAll() {
-  renderChips();
-  renderPills();
+  renderSide();
   renderHome();
   renderArchive();
   renderAbout();
@@ -359,7 +436,7 @@ document.getElementById("side-collapse").addEventListener("click", () => toggleS
 document.getElementById("side-grip").addEventListener("click", () => toggleSidebar(true));
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
-document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderPills(); });
+document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderSide(); });
 $$(".tabbar button").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.nav === "home") showView("home");
   else if (b.dataset.nav === "archive") showView("archive");
