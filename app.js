@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
- * Jerry 的赛博博客 —— 胶囊目录静态博客（iOS 简洁风）
+ * JerryHang 的个人博客 —— 胶囊目录静态博客（iOS 简洁风）
  * 纯原生 JS，零外部依赖。数据来自 posts.json。
  * ============================================================ */
 
@@ -9,7 +9,7 @@ const $  = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = s => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-const SITE = { title: "Jerry 的赛博博客", author: "Jerry", repo: "https://github.com/Jerry-Hang/Jerry-Hang.github.io" };
+const SITE = { title: "JerryHang 的个人博客", author: "JerryHang", repo: "https://github.com/Jerry-Hang/Jerry-Hang.github.io" };
 
 const WALLS = [
   { id: "clean", name: "纯色", img: "" },
@@ -522,7 +522,7 @@ function renderAbout() {
   document.getElementById("about-body").innerHTML =
     '<div class="a-hero">' +
       '<div class="avatar"><img src="assets/avatar.jpg" alt=""></div>' +
-      '<div><h2>' + esc(SITE.title) + '</h2><p>记录赛博修仙日常 · 纯静态博客</p></div>' +
+      '<div><h2>' + esc(SITE.title) + '</h2><p>记录与折腾 · 纯静态博客</p></div>' +
     '</div>' +
     '<div class="about-stats">' +
       '<div class="stat"><b>' + state.posts.length + '</b><span>文章</span></div>' +
@@ -547,7 +547,7 @@ function renderAbout() {
         '<a class="link-btn" href="https://github.com/Eric-Terminal/cf-astro-blog" target="_blank" rel="noopener">cf-astro-blog 参考项目</a>' +
       '</div>' +
     '</div>' +
-    '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 赛博修仙，从记录开始</p>';
+    '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 记录与折腾</p>';
   const wg = document.getElementById("wall-grid");
   if (wg) {
     wg.innerHTML = WALLS.map(w =>

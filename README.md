@@ -1,6 +1,6 @@
-# Jerry 的赛博博客 🚀
+# JerryHang 的个人博客 🚀
 
-> 记录赛博修仙日常 · [jerry-hang.blog](https://jerry-hang.blog)
+> 记录与折腾 · [jerry-hang.blog](https://jerry-hang.blog)
 
 一个 **iOS × Windows 11 混合风格**的桌面系统式静态博客：
 

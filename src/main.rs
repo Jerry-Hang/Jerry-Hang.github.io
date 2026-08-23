@@ -125,8 +125,8 @@ fn build_feed(posts: &[Post]) -> String {
     }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\"><channel>\n<title>{t}</title><link>https://jerry-hang.blog</link><description>{d}</description><language>zh-cn</language>\n{items}</channel></rss>",
-        t = xml_escape("Jerry 的赛博博客"),
-        d = xml_escape("记录赛博修仙日常"),
+        t = xml_escape("JerryHang 的个人博客"),
+        d = xml_escape("记录与折腾"),
         items = items,
     )
 }
