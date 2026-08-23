@@ -108,38 +108,3 @@ blog_hub --publish "提交信息"
 ```
 
 发布后 1-2 分钟，https://jerry-hang.blog 自动更新。
-
-## 📱 手机管理台（blog_hub）
-
-不用登 GitHub、不用找 AI，直接在 Termux 里一键管理博客：
-
-### 启动
-
-```bash
-cd ~/DSH_work/blog_ctl
-./target/release/blog_hub
-```
-
-或者：**Termux 侧滑抽屉 → 长按 → 添加快捷方式 → 「博客管理」**，点一下就进控制台。
-
-### 菜单
-
-| 选项 | 功能 |
-| --- | --- |
-| 1 写新文章 | 引导式输入标题/分类/标签/是否精选 + 多行正文（单行 . 结束） |
-| 2 编辑文章 | 选中文章 → 用 $EDITOR/vim/nano 编辑 |
-| 3 删除文章 | 双重确认后删除 |
-| 4 文章列表 | 按文件名列出 |
-| 5 一键发布 | 自动 build + git add/commit/push（SSH 密钥，无需登录！） |
-| 6 站点状态 | 最近提交 / 未提交改动 / 线上地址 |
-
-### 脚本模式（自动化）
-
-```bash
-blog_hub --list
-blog_hub --status
-blog_hub --new "文章标题"
-blog_hub --publish "提交信息"
-```
-
-发布后 1-2 分钟，https://jerry-hang.blog 自动更新。
