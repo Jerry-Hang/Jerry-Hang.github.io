@@ -100,6 +100,7 @@ input { font-family: inherit; }
 #topbar {
   display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
   height: 36px; padding: 0 10px;
+  padding-top: env(safe-area-inset-top);
   transition: height .3s cubic-bezier(.25,.8,.25,1), grid-template-columns .3s ease;
 }
 #tb-side-btn { display: none; }
@@ -251,13 +252,12 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 
 /* 阅读字号控件（iOS 阅读器样式） */
 .r-fontbar {
-  position: absolute; right: 4px; top: 2px;
   display: none; align-items: center; gap: 2px;
   padding: 3px; border-radius: 999px;
   background: var(--card); border: 1px solid var(--card-border);
   box-shadow: var(--shadow-s);
 }
-#view-reader .r-fontbar { display: flex; }
+#view-reader .r-fontbar { display: flex; justify-content: flex-end; margin-top: 10px; }
 .r-fontbar button {
   width: 26px; height: 26px; border-radius: 999px;
   font-size: 12px; font-weight: 600; color: var(--text-soft);
@@ -271,7 +271,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 /* 站点页脚 */
 .site-footer {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  max-width: 900px; margin: 6px auto 0; padding: 18px 8px 26px;
+  max-width: 900px; margin: 6px auto 0; padding: 18px 8px calc(26px + env(safe-area-inset-bottom));
   font-size: 11.5px; color: var(--text-faint);
 }
 .site-footer .sf-links { display: flex; gap: 12px; }
@@ -299,7 +299,7 @@ button:focus:not(:focus-visible) { outline: none; }
 
 /* 回到顶部 + Toast */
 #back-top {
-  position: fixed; right: 18px; bottom: 22px; z-index: 70;
+  position: fixed; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 70;
   width: 40px; height: 40px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-soft);
@@ -316,7 +316,7 @@ button:focus:not(:focus-visible) { outline: none; }
 #back-top:active { transform: scale(.9); }
 #back-top svg { width: 17px; height: 17px; }
 #toast {
-  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(12px);
+  position: fixed; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(12px);
   z-index: 90; padding: 10px 18px; border-radius: 999px;
   font-size: 12.5px; font-weight: 500; color: var(--text);
   background: var(--bar-bg);
