@@ -250,7 +250,7 @@ function showView(name) {
   $$(".view").forEach(v => v.classList.remove("on"));
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
-  $$(".tabbar button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -265,32 +265,36 @@ function selectArticle(idx) {
   renderSide();
 }
 
-/* ---------- 精选 + 翻页 ---------- */
+/* ---------- 主页文章长条 3/4 + 翻页 ---------- */
 function renderHome() {
   const grid = document.getElementById("pin-grid");
-  const pins = pinnedPosts();
-  const perPage = (window.innerWidth <= 720 ? 2 : 4);
-  const pages = Math.max(1, Math.ceil(pins.length / perPage));
+  const list = state.posts;
+  const perPage = (window.innerWidth <= 720 ? 4 : 6);
+  const pages = Math.max(1, Math.ceil(list.length / perPage));
   if (state.pinnedPage > pages) state.pinnedPage = pages;
   const start = (state.pinnedPage - 1) * perPage;
-  const pageItems = pins.slice(start, start + perPage);
+  const pageItems = list.slice(start, start + perPage);
 
   if (!pageItems.length) {
-    grid.innerHTML = '<div class="empty-tip" style="grid-column:1/-1">暂无文章，运行 blog_ctl new 创建第一篇。</div>';
+    grid.innerHTML = '<div class="empty-tip">暂无文章，运行 blog_ctl new 创建第一篇。</div>';
   } else {
     grid.innerHTML = pageItems.map(p => {
       const idx = state.posts.indexOf(p);
-      const tags = (p.tags || []).map(t => '<span class="tag">' + esc(t) + '</span>').join("");
-      const cats = (p.categories || []).map(c => '<span class="cat-tag">' + esc(c) + '</span>').join("");
-      return '<button class="pin-card" data-idx="' + idx + '">' +
-        '<div class="pc-top"><span class="pc-date">' + esc(p.date || "") + '</span></div>' +
-        '<h3>' + esc(p.title) + '</h3>' +
-        '<p>' + esc(p.desc || (p.body || "").slice(0, 90) || "") + '</p>' +
-        '<div class="pc-meta">' + cats + tags + '<span class="pc-more">阅读</span></div>' +
+      const words = (p.body || "").replace(/\s/g, "").length;
+      const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
+      return '<button class="home-item" data-idx="' + idx + '">' +
+        '<span class="hi-date">' + esc(p.date || "") + '</span>' +
+        '<span class="hi-main">' +
+          '<span class="hi-title">' + esc(p.title) + '</span>' +
+          (p.desc ? '<span class="hi-excerpt">' + esc(p.desc) + '</span>' : '') +
+        '</span>' +
+        '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></span>' +
+        '<span class="hi-arrow">›</span>' +
       '</button>';
     }).join("");
   }
-  $$("#pin-grid .pin-card").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+  $$("#pin-grid .home-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+  if (window.bindTilt) window.bindTilt(grid);
 
   const pager = document.getElementById("pager-home");
   pager.innerHTML =
@@ -402,7 +406,7 @@ function renderAbout() {
   const fine = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
   function attach(root) {
     if (!fine) return;
-    (root || document).querySelectorAll(".pill:not([data-tilt]), .pin-card:not([data-tilt])").forEach(el => {
+    (root || document).querySelectorAll(".pill:not([data-tilt]), .pin-card:not([data-tilt]), .home-item:not([data-tilt])").forEach(el => {
       el.setAttribute("data-tilt", "1");
       el.addEventListener("mousemove", e => {
         const r = el.getBoundingClientRect();
@@ -431,13 +435,12 @@ function renderAll() {
 }
 
 /* ---------- 事件 ---------- */
-document.getElementById("tb-side-btn").addEventListener("click", () => toggleSidebar());
 document.getElementById("side-collapse").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("side-grip").addEventListener("click", () => toggleSidebar(true));
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
 document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderSide(); });
-$$(".tabbar button").forEach(b => b.addEventListener("click", () => {
+$$("#tb-tabs button").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.nav === "home") showView("home");
   else if (b.dataset.nav === "archive") showView("archive");
   else showView("about");
