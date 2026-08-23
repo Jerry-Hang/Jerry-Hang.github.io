@@ -256,6 +256,36 @@ function bindPillEvents(scope) {
   });
   if (window.bindTilt) window.bindTilt(scope);
 }
+function renderArticleSide(box, q) {
+  const ql = q.trim().toLowerCase();
+  if (!ql) { renderOutlineInto(box); return; }
+  const bodyEl = document.getElementById("r-body");
+  if (!bodyEl) { renderOutlineInto(box); return; }
+  const hits = [];
+  bodyEl.querySelectorAll("p, li, blockquote").forEach(n => {
+    if (n.textContent.toLowerCase().indexOf(ql) >= 0) hits.push(n);
+  });
+  if (!hits.length) {
+    box.innerHTML = '<div class="outline-empty">本文中没有「' + esc(q.trim()) + '」</div>';
+    return;
+  }
+  const snippet = n => {
+    const t = n.textContent.replace(/\s+/g, " ").trim();
+    const i = t.toLowerCase().indexOf(ql);
+    return "…" + (i > 24 ? t.slice(i - 24) : t).slice(0, 46) + "…";
+  };
+  box.innerHTML = '<div class="group-head">本文中找到 ' + hits.length + ' 处</div>' +
+    hits.slice(0, 60).map((n, i) =>
+      '<button class="outline-item lv2" data-hit="' + i + '">' + esc(snippet(n)) + '</button>'
+    ).join("");
+  $$(".outline-item", box).forEach(b => b.addEventListener("click", () => {
+    const n = hits[Number(b.dataset.hit)];
+    if (!n) return;
+    if (n.scrollIntoView) n.scrollIntoView({ behavior: "smooth", block: "center" });
+    n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash");
+    setTimeout(() => n.classList.remove("flash"), 1700);
+  }));
+}
 function renderOutlineInto(box) {
   const hands = state.outline;
   if (!hands.length) { box.innerHTML = '<div class="outline-empty">本篇没有标题分节</div>'; return; }
@@ -273,9 +303,18 @@ function renderOutlineInto(box) {
   }));
 }
 function renderSide() {
-  renderModes();
+  const modesBox = document.getElementById("side-modes");
+  const searchBox = document.getElementById("side-search");
   const box = document.getElementById("post-scroll");
-  if (state.sideView === "outline") { renderOutlineInto(box); return; }
+  if (state.sideView === "outline") {
+    if (modesBox) modesBox.style.display = "none";
+    if (searchBox) searchBox.placeholder = "搜索本文…";
+    renderArticleSide(box, searchBox ? searchBox.value.trim() : "");
+    return;
+  }
+  if (modesBox) modesBox.style.display = "";
+  if (searchBox) searchBox.placeholder = "搜索文章…";
+  renderModes();
   const list = filteredPosts();
   document.getElementById("side-count").textContent = list.length + " 篇";
   if (!list.length) { box.innerHTML = '<div class="empty-tip">没有匹配的文章</div>'; return; }
@@ -322,6 +361,8 @@ function selectArticle(idx) {
   openArticle(idx);
   showView("reader");
   state.sideView = "outline";
+  const sb = document.getElementById("side-search");
+  if (sb) { sb.value = ""; sb.placeholder = "搜索本文…"; }
   toggleSidebar(false);
   renderSide();
 }
