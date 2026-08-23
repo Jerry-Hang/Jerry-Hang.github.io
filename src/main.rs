@@ -94,6 +94,22 @@ fn cmd_new(title: &str) {
 }
 
 
+
+/// sitemap.xml（简单站点地图）
+fn build_sitemap(posts: &[Post]) -> String {
+    let mut urls = String::new();
+    urls.push_str("  <url><loc>https://jerry-hang.blog/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n");
+    for p in posts.iter() {
+        urls.push_str(&format!(
+            "  <url><loc>https://jerry-hang.blog/?article={dt}</loc><lastmod>{dt}T00:00:00Z</lastmod><priority>0.8</priority></url>\n",
+            dt = p.date,
+        ));
+    }
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n{urls}</urlset>"
+    )
+}
+
 /// RSS 2.0 feed（订阅用）
 fn build_feed(posts: &[Post]) -> String {
     let mut items = String::new();
@@ -218,6 +234,8 @@ fn cmd_build() {
 
     let out = format!("[{}]", items.join(","));
     fs::write("feed.xml", build_feed(&posts)).expect("写入 feed.xml 失败");
+    fs::write("sitemap.xml", build_sitemap(&posts)).expect("写入 sitemap.xml 失败");
+    fs::write("robots.txt", "User-agent: *\nAllow: /\nSitemap: https://jerry-hang.blog/sitemap.xml\n").expect("写入 robots.txt 失败");
     fs::write("posts.json", out).expect("写入 posts.json 失败");
     println!("✔ 已生成 posts.json（{} 篇文章）", posts.len());
 }

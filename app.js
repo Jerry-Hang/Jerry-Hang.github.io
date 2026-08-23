@@ -27,8 +27,18 @@ const state = {
   sideView: "posts",
   outline: [],
   articleIdx: -1,
-  pinnedPage: 1
+  pinnedPage: 1,
+  fontScale: Number(localStorage.getItem("jb_font") || 0)
 };
+
+const FONT_SIZES = [13.5, 15, 16.5, 18];
+function applyFontScale() {
+  const el = document.getElementById("r-body");
+  if (el) el.style.fontSize = FONT_SIZES[state.fontScale] + "px";
+  const cur = document.getElementById("r-font-cur");
+  if (cur) cur.textContent = "A" + (state.fontScale > 0 ? "+".repeat(state.fontScale) : "");
+  localStorage.setItem("jb_font", String(state.fontScale));
+}
 
 function applyWall() {
   const w = WALLS.find(x => x.id === state.wall) || WALLS[0];
@@ -134,6 +144,7 @@ function mdToHtml(md) {
 
 /* ---------- 数据 ---------- */
 async function loadPosts() {
+  document.getElementById("post-scroll").innerHTML = '<div class="loading-tip">加载中…</div>';
   try {
     const res = await fetch("posts.json", { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -291,6 +302,7 @@ function showView(name) {
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  document.body.classList.toggle("reading", name === "reader");
   state.nav = name;
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
@@ -370,6 +382,13 @@ function openArticle(idx) {
     '<span>约 ' + readMinutes(p) + ' 分钟</span>';
   const mdBody = document.getElementById("r-body");
   mdBody.innerHTML = mdToHtml(p.body);
+  mdBody.querySelectorAll("pre").forEach(pre => {
+    const b = document.createElement("button");
+    b.className = "code-copy";
+    b.textContent = "复制";
+    pre.appendChild(b);
+  });
+  applyFontScale();
   const outline = [];
   mdBody.querySelectorAll("h1,h2,h3").forEach((h, i) => {
     h.id = "sec-" + i;
@@ -423,6 +442,7 @@ function renderAbout() {
     (p.categories || []).forEach(c => cats.add(c));
   });
   const latest = state.posts.length ? state.posts[0].date : "—";
+  const totalWords = state.posts.reduce((n, p) => n + (p.body || "").replace(/\s/g, "").length, 0);
   document.getElementById("about-body").innerHTML =
     '<div class="a-hero">' +
       '<div class="avatar"><img src="assets/avatar.jpg" alt=""></div>' +
@@ -432,7 +452,7 @@ function renderAbout() {
       '<div class="stat"><b>' + state.posts.length + '</b><span>文章</span></div>' +
       '<div class="stat"><b>' + cats.size + '</b><span>分类</span></div>' +
       '<div class="stat"><b>' + tags.size + '</b><span>标签</span></div>' +
-      '<div class="stat"><b>' + latest + '</b><span>最近更新</span></div>' +
+      '<div class="stat"><b>' + totalWords.toLocaleString() + '</b><span>总字数</span></div>' +
     '</div>' +
     '<div class="sect"><h3 style="font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">壁纸</h3>' +
       '<div class="wall-grid" id="wall-grid"></div>' +
@@ -513,8 +533,29 @@ $$("#tb-tabs button").forEach(b => b.addEventListener("click", () => {
   else if (b.dataset.nav === "archive") showView("archive");
   else showView("about");
 }));
+document.getElementById("r-font-dec").addEventListener("click", () => {
+  if (state.fontScale > 0) { state.fontScale--; applyFontScale(); }
+});
+document.getElementById("r-font-inc").addEventListener("click", () => {
+  if (state.fontScale < FONT_SIZES.length - 1) { state.fontScale++; applyFontScale(); }
+});
+document.getElementById("r-body").addEventListener("click", e => {
+  const btn = e.target.closest(".code-copy");
+  if (!btn) return;
+  const pre = btn.closest("pre");
+  const code = pre ? (pre.querySelector("code") ? pre.querySelector("code").textContent : "") : "";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => showToast("代码已复制")).catch(() => showToast("复制失败"));
+  } else {
+    showToast("复制失败");
+  }
+});
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") { toggleSidebar(false); return; }
+  if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+    const tag2 = (e.target && e.target.tagName) || "";
+    if (tag2 !== "INPUT" && tag2 !== "TEXTAREA") { e.preventDefault(); document.getElementById("side-search").focus(); return; }
+  }
   const tag = (e.target && e.target.tagName) || "";
   if (tag === "INPUT" || tag === "TEXTAREA") return;
   if (state.nav === "reader" && state.articleIdx >= 0) {
@@ -524,13 +565,22 @@ document.addEventListener("keydown", e => {
 });
 window.addEventListener("resize", () => { renderHome(); });
 
-/* 返回顶部 */
+/* 返回顶部 + 阅读进度 */
 (function() {
   const btn = document.getElementById("back-top");
+  const bar = document.getElementById("progress-bar");
   let show = false;
   window.addEventListener("scroll", () => {
     const s = window.scrollY > 480;
     if (s !== show) { show = s; btn.classList.toggle("show", s); }
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - window.innerHeight;
+    if (max > 0 && document.body.classList.contains("reading")) {
+      bar.style.width = Math.min(100, (window.scrollY / max) * 100).toFixed(2) + "%";
+      bar.classList.add("show");
+    } else {
+      bar.classList.remove("show");
+    }
   }, { passive: true });
   btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 })();

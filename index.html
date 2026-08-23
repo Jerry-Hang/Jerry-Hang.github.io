@@ -239,6 +239,64 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .outline-item.lv3 { padding-left: 34px; font-size: 12px; color: var(--text-faint); }
 .outline-empty { color: var(--text-faint); font-size: 12px; padding: 12px 6px; }
 
+/* 阅读进度条 */
+#progress-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 75;
+  height: 2px; width: 0;
+  background: var(--accent);
+  opacity: 0; transition: opacity .3s ease, width .1s linear;
+  pointer-events: none;
+}
+#progress-bar.show { opacity: 1; }
+
+/* 阅读字号控件（iOS 阅读器样式） */
+.r-fontbar {
+  position: absolute; right: 4px; top: 2px;
+  display: none; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-s);
+}
+#view-reader .r-fontbar { display: flex; }
+.r-fontbar button {
+  width: 26px; height: 26px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--text-soft);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s ease, color .15s ease;
+}
+.r-fontbar button:hover { background: var(--accent-soft); color: var(--accent); }
+.r-fontbar button:active { transform: scale(.9); }
+.r-fontbar span { font-size: 11px; font-weight: 600; color: var(--text-faint); padding: 0 3px; font-variant-numeric: tabular-nums; }
+
+/* 站点页脚 */
+.site-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  max-width: 900px; margin: 6px auto 0; padding: 18px 8px 26px;
+  font-size: 11.5px; color: var(--text-faint);
+}
+.site-footer .sf-links { display: flex; gap: 12px; }
+.site-footer a { color: var(--text-soft); font-weight: 500; }
+.site-footer a:hover { color: var(--accent); }
+
+/* 键盘焦点环（a11y） */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+button:focus:not(:focus-visible) { outline: none; }
+
+/* 代码复制按钮 */
+.md-body pre { position: relative; }
+.code-copy {
+  position: absolute; top: 8px; right: 8px;
+  padding: 4px 10px; border-radius: 8px;
+  font-size: 10.5px; font-weight: 600; color: var(--text-soft);
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+  opacity: 0; transition: opacity .2s ease, background .15s ease;
+}
+.md-body pre:hover .code-copy { opacity: 1; }
+.code-copy:hover { background: rgba(255,255,255,.24); }
+
+/* 数据加载中 */
+.loading-tip { text-align: center; color: var(--text-faint); font-size: 12px; padding: 28px 8px; }
+
 /* 回到顶部 + Toast */
 #back-top {
   position: fixed; right: 18px; bottom: 22px; z-index: 70;
@@ -436,10 +494,11 @@ body.dark .home-item::after { background: radial-gradient(300px circle at var(--
 
 /* 阅读 */
 .reader-head { margin-bottom: 22px; }
-.reader-head .r-cats { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.reader-head .r-cats { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; line-height: 1.4; }
 .reader-head h1 { font-size: clamp(21px, 4.4vw, 29px); font-weight: 700; line-height: 1.32; letter-spacing: -.015em; }
-.reader-head .r-meta { display: flex; gap: 10px; align-items: center; margin-top: 12px; color: var(--text-faint); font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.reader-head .r-meta { display: flex; gap: 12px; align-items: center; margin-top: 14px; color: var(--text-faint); font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
 .md-body { line-height: 1.9; font-size: 15px; }
+.md-body > h1:first-child { display: none; }
 .md-body h1, .md-body h2, .md-body h3, .md-body h4 { font-weight: 700; margin: 1.5em 0 .5em; line-height: 1.35; letter-spacing: -.01em; }
 .md-body h1 { font-size: 1.42em; } .md-body h2 { font-size: 1.26em; } .md-body h3 { font-size: 1.1em; }
 .md-body p { margin: .85em 0; }
@@ -480,7 +539,9 @@ body.dark .home-item::after { background: radial-gradient(300px circle at var(--
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.18) 60%, rgba(255,255,255,.3));
 }
-body.dark #wall-shade { background: linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.45) 60%, rgba(0,0,0,.6)); }
+body.dark #wall-shade { background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55) 60%, rgba(0,0,0,.7)); }
+body.reading #wall-shade { background: linear-gradient(180deg, rgba(10,12,18,.62), rgba(10,12,18,.72) 60%, rgba(10,12,18,.78)); }
+body.reading:not(.dark) #wall-shade { background: linear-gradient(180deg, rgba(244,246,250,.9), rgba(244,246,250,.94)); }
 #desktop, #layout, #content, .top-area { position: relative; z-index: 2; }
 
 /* 卡片毛玻璃透视壁纸 */
@@ -576,6 +637,7 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
 
 <div id="wallpaper"></div>
 <div id="wall-shade"></div>
+<div id="progress-bar"></div>
 
 <div class="top-area">
   <header id="topbar">
@@ -633,6 +695,11 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
         <div class="r-cats" id="r-cats"></div>
         <h1 id="r-title"></h1>
         <div class="r-meta" id="r-meta"></div>
+        <div class="r-fontbar" id="r-fontbar">
+          <button id="r-font-dec" aria-label="减小字号">A−</button>
+          <span id="r-font-cur" aria-label="当前字号">A</span>
+          <button id="r-font-inc" aria-label="增大字号">A+</button>
+        </div>
       </div>
       <div class="md-body" id="r-body"></div>
       <div class="reader-foot" id="r-foot"></div>
@@ -652,6 +719,13 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
   </div>
 </div>
 
+<footer class="site-footer">
+  <span>© 2026 Jerry · 赛博修仙，从记录开始</span>
+  <span class="sf-links">
+    <a href="feed.xml" target="_blank" rel="noopener">RSS</a>
+    <a href="https://github.com/Jerry-Hang/Jerry-Hang.github.io" target="_blank" rel="noopener">GitHub</a>
+  </span>
+</footer>
 <div id="scrim"></div>
 <button id="back-top" aria-label="回到顶部">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
