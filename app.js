@@ -361,7 +361,7 @@ function showView(name) {
   doIt();
 }
 function articleHash(p) {
-  const key = encodeURIComponent(p.slug || p.title || "");
+  const key = encodeURI(p.slug || p.title || "");
   return "#/post/" + key;
 }
 function selectArticle(idx) {
@@ -654,7 +654,7 @@ window.addEventListener("resize", () => { renderHome(); });
 window.addEventListener("hashchange", () => {
   const m = (location.hash || "").match(/^#\/post\/(.+)$/);
   if (m) {
-    const key = decodeURIComponent(m[1]);
+    const key = decodeURI(m[1]);
     const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
     if (idx >= 0) selectArticle(idx); else showView("home");
   } else {
@@ -664,7 +664,7 @@ window.addEventListener("hashchange", () => {
 function openFromHashIfAny() {
   const m = (location.hash || "").match(/^#\/post\/(.+)$/);
   if (!m) return;
-  const key = decodeURIComponent(m[1]);
+  const key = decodeURI(m[1]);
   const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
   if (idx >= 0) selectArticle(idx);
 }
