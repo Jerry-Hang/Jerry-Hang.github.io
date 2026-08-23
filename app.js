@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
- * Jerry 的赛博博客 —— 胶囊目录静态博客
+ * Jerry 的赛博博客 —— 胶囊目录静态博客（iOS 简洁风）
  * 纯原生 JS，零外部依赖。数据来自 posts.json。
  * ============================================================ */
 
@@ -17,16 +17,12 @@ const state = {
   q: "",
   cat: "全部",
   articleIdx: -1,
-  pinnedPage: 1,
-  nav: "home",
-  sideOpen: false
+  pinnedPage: 1
 };
 
-/* ---------- 主题 ---------- */
+/* ---------- 主题：跟随系统 + 手动切换 ---------- */
 function applyTheme() {
   document.body.classList.toggle("dark", state.theme === "dark");
-  const btn = document.getElementById("tb-theme");
-  btn.textContent = state.theme === "dark" ? "☀️" : "🌙";
   localStorage.setItem("jb_theme", state.theme);
 }
 function toggleTheme() { state.theme = state.theme === "dark" ? "light" : "dark"; applyTheme(); }
@@ -155,7 +151,6 @@ function pinnedPosts() {
   const ps = state.posts.filter(p => p.pinned);
   return ps.length ? ps : state.posts.slice(0, 4);
 }
-function postByIdx(idx) { return state.posts[idx]; }
 
 /* ---------- 侧栏 ---------- */
 function toggleSidebar(force) {
@@ -165,7 +160,6 @@ function toggleSidebar(force) {
   } else {
     const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
     document.getElementById("layout").classList.toggle("side-open", open);
-    state.sideOpen = open;
     document.getElementById("tb-side-label").textContent = open ? "收起" : "目录";
   }
 }
@@ -175,7 +169,7 @@ function renderChips() {
   box.innerHTML = cats.map(c =>
     '<button class="chip' + (c === state.cat ? " on" : "") + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>'
   ).join("");
-  Array.from(document.querySelectorAll("#side-chips .chip")).forEach(b => b.addEventListener("click", () => {
+  $$("#side-chips .chip").forEach(b => b.addEventListener("click", () => {
     state.cat = b.dataset.cat;
     renderChips();
     renderPills();
@@ -186,25 +180,22 @@ function renderPills() {
   const box = document.getElementById("post-scroll");
   document.getElementById("side-count").textContent = list.length + " 篇";
   if (!list.length) {
-    box.innerHTML = '<div class="empty-tip">没有匹配的文章 🫥</div>';
+    box.innerHTML = '<div class="empty-tip">没有匹配的文章</div>';
     return;
   }
   box.innerHTML = list.map(p => {
     const idx = state.posts.indexOf(p);
     const sel = idx === state.articleIdx ? " selected" : "";
-    const tag = (p.tags && p.tags[0]) ? '<span class="p-tag">' + esc(p.tags[0]) + '</span>' : "";
     return '<div class="pill-wrap">' +
       '<button class="pill' + sel + '" data-idx="' + idx + '">' +
         '<span class="p-date">' + esc(p.date || "") + '</span>' +
         '<span class="p-title">' + esc(p.title) + '</span>' +
-        tag +
       '</button>' +
     '</div>';
   }).join("");
 
-  Array.from(document.querySelectorAll("#post-scroll .pill")).forEach(btn => {
+  $$("#post-scroll .pill").forEach(btn => {
     btn.addEventListener("click", () => selectArticle(Number(btn.dataset.idx)));
-
     let tmr = null;
     const press = () => { tmr = setTimeout(() => btn.classList.add("pressing"), 380); };
     const release = () => { clearTimeout(tmr); btn.classList.remove("pressing"); };
@@ -215,13 +206,12 @@ function renderPills() {
   });
 }
 
-/* ---------- 视图切换 ---------- */
+/* ---------- 视图 ---------- */
 function showView(name) {
-  Array.from(document.querySelectorAll(".view")).forEach(v => v.classList.remove("on"));
+  $$(".view").forEach(v => v.classList.remove("on"));
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
-  Array.from(document.querySelectorAll(".tb-nav button")).forEach(b => b.classList.toggle("on", b.dataset.nav === name));
-  state.nav = name;
+  $$(".tb-nav button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   if (window.innerWidth <= 720) toggleSidebar(false);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -232,7 +222,7 @@ function selectArticle(idx) {
   showView("reader");
 }
 
-/* ---------- 主页（精选 + 翻页） ---------- */
+/* ---------- 精选 + 翻页 ---------- */
 function renderHome() {
   const grid = document.getElementById("pin-grid");
   const pins = pinnedPosts();
@@ -243,28 +233,28 @@ function renderHome() {
   const pageItems = pins.slice(start, start + perPage);
 
   if (!pageItems.length) {
-    grid.innerHTML = '<div class="empty-tip" style="grid-column:1/-1">还没有文章 —— 运行 blog_ctl new 写下第一篇 ✍️</div>';
+    grid.innerHTML = '<div class="empty-tip" style="grid-column:1/-1">暂无文章，运行 blog_ctl new 创建第一篇。</div>';
   } else {
     grid.innerHTML = pageItems.map(p => {
       const idx = state.posts.indexOf(p);
       const tags = (p.tags || []).map(t => '<span class="tag">' + esc(t) + '</span>').join("");
-      const cats = (p.categories || []).map(c => '<span class="tag" style="background:transparent;border:1px solid var(--card-border);color:var(--text-soft)">' + esc(c) + '</span>').join("");
+      const cats = (p.categories || []).map(c => '<span class="cat-tag">' + esc(c) + '</span>').join("");
       return '<button class="pin-card" data-idx="' + idx + '">' +
-        '<div class="pc-top"><span class="badge">精选</span><span class="pc-date">' + esc(p.date || "") + '</span></div>' +
+        '<div class="pc-top"><span class="pc-date">' + esc(p.date || "") + '</span></div>' +
         '<h3>' + esc(p.title) + '</h3>' +
         '<p>' + esc(p.desc || (p.body || "").slice(0, 90) || "") + '</p>' +
-        '<div class="pc-meta">' + cats + tags + '<span class="pc-more">阅读全文 →</span></div>' +
+        '<div class="pc-meta">' + cats + tags + '<span class="pc-more">阅读</span></div>' +
       '</button>';
     }).join("");
   }
-  Array.from(document.querySelectorAll("#pin-grid .pin-card")).forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+  $$("#pin-grid .pin-card").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
 
   const pager = document.getElementById("pager-home");
   pager.innerHTML =
     '<button class="pg-btn" id="pg-prev" ' + (state.pinnedPage <= 1 ? "disabled" : "") + '>‹ 上一页</button>' +
     '<span class="pg-info">第 <b>' + state.pinnedPage + '</b> / ' + pages + ' 页</span>' +
     '<input class="pg-input" id="pg-input" type="number" min="1" max="' + pages + '" value="' + state.pinnedPage + '" aria-label="页码">' +
-    '<button class="pg-btn" id="pg-go">跳转</button>' +
+    '<button class="pg-btn" id="pg-go">前往</button>' +
     '<button class="pg-btn" id="pg-next" ' + (state.pinnedPage >= pages ? "disabled" : "") + '>下一页 ›</button>';
   document.getElementById("pg-prev").addEventListener("click", () => { state.pinnedPage--; renderHome(); });
   document.getElementById("pg-next").addEventListener("click", () => { state.pinnedPage++; renderHome(); });
@@ -282,19 +272,19 @@ function openArticle(idx) {
   const p = state.posts[idx];
   if (!p) return;
   const cats = (p.categories || []).map(c => '<span class="tag">' + esc(c) + '</span>').join("");
-  const tags = (p.tags || []).map(t => '<span class="tag" style="background:transparent;border:1px solid var(--card-border);color:var(--text-soft)">' + esc(t) + '</span>').join("");
+  const tags = (p.tags || []).map(t => '<span class="cat-tag">' + esc(t) + '</span>').join("");
   document.getElementById("r-cats").innerHTML = cats + tags;
   document.getElementById("r-title").textContent = p.title;
   document.getElementById("r-meta").innerHTML =
-    '<span>📅 ' + esc(p.date || "") + '</span>' +
-    '<span>✍️ ' + esc(SITE.author) + '</span>' +
-    '<span>📖 ' + esc((p.body || "").length) + ' 字</span>';
+    '<span>' + esc(p.date || "") + '</span>' +
+    '<span>' + esc(SITE.author) + '</span>' +
+    '<span>' + esc((p.body || "").length) + ' 字</span>';
   document.getElementById("r-body").innerHTML = mdToHtml(p.body);
   const prev = state.posts[idx - 1];
   const next = state.posts[idx + 1];
   document.getElementById("r-foot").innerHTML =
     '<button class="pn-btn' + (prev ? "" : " disabled") + '" id="r-prev">‹ ' + (prev ? esc(prev.title) : "已是最早") + '</button>' +
-    '<button class="pn-btn" id="r-back">← 返回精选</button>' +
+    '<button class="pn-btn" id="r-back">返回精选</button>' +
     '<button class="pn-btn' + (next ? "" : " disabled") + '" id="r-next">' + (next ? esc(next.title) : "已是最新") + ' ›</button>';
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
   if (next) document.getElementById("r-next").addEventListener("click", () => selectArticle(idx + 1));
@@ -305,7 +295,7 @@ function openArticle(idx) {
 function renderArchive() {
   const box = document.getElementById("arch-body");
   const list = state.posts;
-  if (!list.length) { box.innerHTML = '<div class="empty-tip">还没有文章</div>'; return; }
+  if (!list.length) { box.innerHTML = '<div class="empty-tip">暂无文章</div>'; return; }
   const years = {};
   list.forEach(p => {
     const y = (p.date || "").slice(0, 4) || "未知";
@@ -319,12 +309,11 @@ function renderArchive() {
         return '<button class="arch-item" data-idx="' + idx + '">' +
           '<span class="a-date">' + esc(p.date || "") + '</span>' +
           '<span class="a-title">' + esc(p.title) + '</span>' +
-          '<span style="font-size:11.5px;font-weight:700;color:var(--accent)">→</span>' +
         '</button>';
       }).join("") +
     '</div>'
   ).join("");
-  Array.from(document.querySelectorAll("#arch-body .arch-item")).forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+  $$("#arch-body .arch-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
 }
 
 /* ---------- 关于 ---------- */
@@ -348,12 +337,12 @@ function renderAbout() {
       '<div class="stat"><b>' + latest + '</b><span>最近更新</span></div>' +
     '</div>' +
     '<p style="font-size:13px;line-height:1.8;color:var(--text-soft)">' +
-      '这是一个用 <b>Rust</b> 命令行工具 + 原生 HTML/CSS/JS 打造的「胶囊目录」静态博客。' +
+      '一个用 Rust 命令行工具与原生 HTML / CSS / JS 打造的胶囊目录静态博客。' +
       '左侧目录栏像抽屉一样展开：搜索、筛选、滚动胶囊列表；右侧是置顶的精选内容。' +
     '</p>' +
     '<div class="a-links">' +
-      '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">🐙 GitHub 仓库</a>' +
-      '<a class="link-btn" href="mailto:jerry@example.com">✉️ 联系我</a>' +
+      '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">GitHub 仓库</a>' +
+      '<a class="link-btn" href="mailto:jerry@example.com">联系我</a>' +
     '</div>' +
     '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 赛博修仙，从记录开始</p>';
 }
@@ -373,8 +362,7 @@ document.getElementById("side-grip").addEventListener("click", () => toggleSideb
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
 document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderPills(); });
-document.getElementById("side-search").addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });
-Array.from(document.querySelectorAll(".tb-nav button")).forEach(b => b.addEventListener("click", () => {
+$$(".tb-nav button").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.nav === "home") showView("home");
   else if (b.dataset.nav === "archive") showView("archive");
   else showView("about");
