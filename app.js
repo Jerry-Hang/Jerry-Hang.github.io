@@ -182,16 +182,19 @@ function renderPills() {
     box.innerHTML = '<div class="empty-tip">没有匹配的文章</div>';
     return;
   }
-  box.innerHTML = list.map(p => {
+  box.innerHTML = '<div class="pill-grid">' + list.map(p => {
     const idx = state.posts.indexOf(p);
     const sel = idx === state.articleIdx ? " selected" : "";
+    const words = (p.body || "").replace(/\s/g, "").length;
+    const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
     return '<div class="pill-wrap">' +
       '<button class="pill' + sel + '" data-idx="' + idx + '">' +
         '<span class="p-date">' + esc(p.date || "") + '</span>' +
         '<span class="p-title">' + esc(p.title) + '</span>' +
+        '<div class="p-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></div>' +
       '</button>' +
     '</div>';
-  }).join("");
+  }).join("") + '</div>';
 
   $$("#post-scroll .pill").forEach(btn => {
     btn.addEventListener("click", () => selectArticle(Number(btn.dataset.idx)));
@@ -370,6 +373,16 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && window.innerWidth <= 720) toggleSidebar(false);
 });
 window.addEventListener("resize", () => { renderHome(); });
+
+/* 滚动收缩：顶部横条 → 悬浮胶囊（平滑过渡） */
+(function() {
+  const topArea = document.querySelector(".top-area");
+  let compact = false;
+  window.addEventListener("scroll", () => {
+    const should = window.scrollY > 70;
+    if (should !== compact) { compact = should; topArea.classList.toggle("compact", compact); }
+  }, { passive: true });
+})();
 
 /* ---------- 初始化 ---------- */
 (function init() {
