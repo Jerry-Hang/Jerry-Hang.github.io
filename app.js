@@ -360,6 +360,7 @@ function renderAll() {
 
 /* ---------- 事件 ---------- */
 document.getElementById("tb-side-btn").addEventListener("click", () => toggleSidebar());
+document.getElementById("side-collapse").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("side-grip").addEventListener("click", () => toggleSidebar(true));
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);

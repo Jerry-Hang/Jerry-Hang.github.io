@@ -75,28 +75,45 @@ input { font-family: inherit; }
 .icon-btn:active { transform: scale(.88); }
 .icon-btn svg { width: 17px; height: 17px; }
 .top-area {
-  position: sticky; top: 0; z-index: 60;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
   background: var(--bar-bg);
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
   border-bottom: 1px solid var(--card-border);
-  transition: width .38s cubic-bezier(.25,.8,.25,1), margin .38s cubic-bezier(.25,.8,.25,1),
-              border-radius .38s ease, box-shadow .38s ease;
+  transition: width .3s cubic-bezier(.25,.8,.25,1), margin .3s cubic-bezier(.25,.8,.25,1),
+              border-radius .3s ease, box-shadow .3s ease;
+  will-change: width, margin, border-radius, box-shadow;
 }
 .top-area.compact {
   width: min(92vw, 400px);
-  margin: 10px auto 0;
+  margin: 8px auto 0;
   border-radius: 999px;
   border-bottom-color: transparent;
   box-shadow: var(--shadow-m);
 }
-.top-area.compact #topbar { height: 44px; }
-.top-area .tabbar { max-height: 48px; opacity: 1; overflow: hidden; transition: max-height .32s ease, opacity .24s ease, padding .32s ease; }
-.top-area.compact .tabbar { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
+.top-area.compact #topbar { height: 42px; }
 #topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  height: 52px; padding: 0 12px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  height: 52px; padding: 0 10px;
+  transition: height .3s cubic-bezier(.25,.8,.25,1);
 }
+#tb-side-btn { display: none; }
+@media (max-width: 720px) {
+  #tb-side-btn {
+    display: inline-flex; align-items: center; justify-self: start;
+    height: 33px; padding: 0 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; color: var(--text);
+    background: var(--card); border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-s);
+    transition: transform .12s ease, background .18s ease;
+  }
+  #tb-side-btn:active { transform: scale(.94); }
+}
+#tb-brand { justify-self: center; }
+#tb-theme { justify-self: end; }
+.top-area .tabbar { max-height: 46px; opacity: 1; overflow: hidden; will-change: max-height, opacity; transition: max-height .26s ease, opacity .2s ease, padding .26s ease; }
+.top-area.compact .tabbar { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
+#layout { padding-top: 98px; }
 #tb-brand { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0 auto; }
 #tb-brand b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
 #tb-brand span { font-size: 11px; color: var(--text-faint); }
@@ -129,7 +146,7 @@ body.dark #tb-theme .i-sun { display: block; }
   min-width: 56px; max-width: 520px;
   margin: 12px 16px 16px 12px;
   border-radius: 24px;
-  min-height: calc(100vh - 128px);
+  min-height: calc(100vh - 132px);
   transition: flex-basis .45s cubic-bezier(.25,.8,.25,1), border-radius .45s ease;
   background: var(--bar-bg);
   backdrop-filter: blur(24px) saturate(1.8);
@@ -153,12 +170,34 @@ body.dark #tb-theme .i-sun { display: block; }
   transition: opacity .2s ease, color .2s ease;
 }
 #layout.side-open #side-grip { opacity: 0; pointer-events: none; }
-#side-grip:hover { color: var(--accent); }
+#side-grip { cursor: pointer; }
+#side-grip:hover { color: var(--accent); background: var(--accent-soft); }
+#side-grip::after {
+  content: ""; position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  width: 30px; height: 30px; border-radius: 999px;
+  background-color: var(--card);
+  border: 1px solid var(--card-border);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007aff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E");
+  background-position: center; background-repeat: no-repeat; background-size: 13px;
+  transition: transform .2s ease, background-color .2s ease;
+}
+#side-grip:hover::after { transform: translateX(-50%) translateY(-2px); background-color: var(--accent-soft); }
 
 /* 侧栏面板 */
 #side-panel { display: flex; flex-direction: column; height: 100%; width: 100%; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
 #layout.side-open #side-panel { opacity: 1; pointer-events: auto; }
 .side-head { padding: 14px 16px 8px; }
+.side-head-top { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 10px; }
+.side-head-top .t { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+.side-collapse {
+  width: 28px; height: 28px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint);
+  transition: background .18s ease, color .18s ease, transform .12s ease;
+}
+.side-collapse:hover { background: var(--accent-soft); color: var(--accent); }
+.side-collapse:active { transform: scale(.88); }
+.side-collapse svg { width: 13px; height: 13px; }
 .side-search-box { position: relative; }
 .side-search-box .s-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-faint); pointer-events: none; }
 #side-search {
@@ -385,9 +424,7 @@ body.m-side-open #scrim { opacity: 1; pointer-events: auto; }
 
 <div class="top-area">
   <header id="topbar">
-    <button class="icon-btn" id="tb-side-btn" aria-label="目录">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
+    <button id="tb-side-btn" aria-label="目录">目录</button>
     <div id="tb-brand">
       <b>Jerry 的赛博博客</b>
       <span>记录赛博修仙日常</span>
@@ -409,6 +446,12 @@ body.m-side-open #scrim { opacity: 1; pointer-events: auto; }
     <div id="side-grip">目录</div>
     <div id="side-panel">
       <div class="side-head">
+        <div class="side-head-top">
+          <span class="t">目录</span>
+          <button class="side-collapse" id="side-collapse" aria-label="收起目录">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
         <div class="side-search-box">
           <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/></svg>
           <input id="side-search" type="search" placeholder="搜索" autocomplete="off">
