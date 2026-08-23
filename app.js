@@ -409,9 +409,14 @@ function renderAbout() {
   });
   const latest = state.posts.length ? state.posts[0].date : "—";
   document.getElementById("about-body").innerHTML =
+    '<div class="about-banner"><img src="assets/banner.jpg" alt=""></div>' +
     '<div class="a-hero">' +
-      '<div class="avatar">J</div>' +
+      '<div class="avatar"><img src="assets/avatar.jpg" alt=""></div>' +
       '<div><h2>' + esc(SITE.title) + '</h2><p>记录赛博修仙日常 · 纯静态博客</p></div>' +
+    '</div>' +
+    '<div class="a-gallery">' +
+      '<img src="assets/avatar3.jpg" alt="">' +
+      '<img src="assets/skull.jpg" alt="">' +
     '</div>' +
     '<div class="about-stats">' +
       '<div class="stat"><b>' + state.posts.length + '</b><span>文章</span></div>' +
