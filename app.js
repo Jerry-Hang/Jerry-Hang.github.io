@@ -305,14 +305,17 @@ function renderOutlineInto(box) {
 function renderSide() {
   const modesBox = document.getElementById("side-modes");
   const searchBox = document.getElementById("side-search");
+  const label = document.querySelector(".side-label");
   const box = document.getElementById("post-scroll");
   if (state.sideView === "outline") {
     if (modesBox) modesBox.style.display = "none";
+    if (label) label.style.display = "none";
     if (searchBox) searchBox.placeholder = "搜索本文…";
     renderArticleSide(box, searchBox ? searchBox.value.trim() : "");
     return;
   }
   if (modesBox) modesBox.style.display = "";
+  if (label) label.style.display = "";
   if (searchBox) searchBox.placeholder = "搜索文章…";
   renderModes();
   const list = filteredPosts();
