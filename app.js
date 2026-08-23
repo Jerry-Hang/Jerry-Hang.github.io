@@ -18,12 +18,9 @@ const WALLS = [
   { id: "banner", name: "草地", img: "assets/banner.jpg" }
 ];
 
-let storedWall = localStorage.getItem("jb_wall");
-if (storedWall === "avatar3") { storedWall = ""; localStorage.removeItem("jb_wall"); }
-
 const state = {
   theme: localStorage.getItem("jb_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
-  wall: storedWall || "skull",
+  wall: localStorage.getItem("jb_wall2") || "skull",
   posts: [],
   q: "",
   sideMode: "cat",
@@ -37,7 +34,7 @@ function applyWall() {
   const w = WALLS.find(x => x.id === state.wall) || WALLS[0];
   const el = document.getElementById("wallpaper");
   if (el) el.style.backgroundImage = w.img ? "url('" + w.img + "')" : "none";
-  localStorage.setItem("jb_wall", state.wall);
+  localStorage.setItem("jb_wall2", state.wall);
 }
 
 /* ---------- 主题：跟随系统 + 手动切换 ---------- */
