@@ -207,12 +207,14 @@ function copyPageLink() {
 function toggleSidebar(force) {
   const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
   document.getElementById("layout").classList.toggle("side-open", open);
+  const grip = document.getElementById("side-grip");
+  if (grip) grip.setAttribute("aria-expanded", open ? "true" : "false");
 }
 function renderModes() {
   const box = document.getElementById("side-modes");
   const modes = [["cat", "分类"], ["tag", "标签"], ["pin", "精选"]];
   box.innerHTML = modes.map(m =>
-    '<button class="mode' + (state.sideMode === m[0] ? " on" : "") + '" data-mode="' + m[0] + '">' + m[1] + '</button>'
+    '<button class="mode' + (state.sideMode === m[0] ? " on" : "") + '" data-mode="' + m[0] + '" aria-pressed="' + (state.sideMode === m[0] ? "true" : "false") + '">' + m[1] + '</button>'
   ).join("");
   $$("#side-modes .mode").forEach(b => b.addEventListener("click", () => {
     state.sideMode = b.dataset.mode;
@@ -298,15 +300,21 @@ function renderSide() {
 
 /* ---------- 视图 ---------- */
 function showView(name) {
-  $$(".view").forEach(v => v.classList.remove("on"));
-  const v = document.getElementById("view-" + name);
-  if (v) v.classList.add("on");
+  const doIt = () => {
+    $$(".view").forEach(v => v.classList.remove("on"));
+    const v = document.getElementById("view-" + name);
+    if (v) v.classList.add("on");
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   document.body.classList.toggle("reading", name === "reader");
   state.nav = name;
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  if (document.startViewTransition) {
+    try { document.startViewTransition(doIt); return; } catch (e) { /* 降级为直接切换 */ }
+  }
+  doIt();
 }
 function selectArticle(idx) {
   state.articleIdx = idx;
@@ -406,6 +414,30 @@ function openArticle(idx) {
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
   if (next) document.getElementById("r-next").addEventListener("click", () => selectArticle(idx + 1));
   document.getElementById("r-back").addEventListener("click", () => showView("home"));
+
+  // 相关文章（同分类优先，最多2篇）
+  const relBox = document.getElementById("r-related");
+  if (relBox) {
+    const catsHere = p.categories || [];
+    const rels = state.posts
+      .filter(q => q !== p && (q.categories || []).some(c => catsHere.includes(c)))
+      .slice(0, 2);
+    if (rels.length) {
+      relBox.innerHTML = '<div class="rel-title">相关文章</div>' +
+        '<div class="rel-list">' +
+        rels.map(q => {
+          const qi = state.posts.indexOf(q);
+          return '<button class="rel-item" data-idx="' + qi + '">' +
+            '<span class="rel-date">' + esc(q.date || "") + '</span>' +
+            '<span class="rel-t">' + esc(q.title) + '</span>' +
+          '</button>';
+        }).join("") +
+        '</div>';
+      $$(".rel-item", relBox).forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+    } else {
+      relBox.innerHTML = "";
+    }
+  }
 }
 
 /* ---------- 归档 ---------- */
