@@ -398,7 +398,7 @@ function openArticle(idx) {
   });
   applyFontScale();
   const outline = [];
-  mdBody.querySelectorAll("h1,h2,h3").forEach((h, i) => {
+  mdBody.querySelectorAll("h2,h3").forEach((h, i) => {
     h.id = "sec-" + i;
     outline.push({ id: "sec-" + i, level: Number(h.tagName[1]), text: h.textContent.trim() });
   });
