@@ -13,9 +13,9 @@ const SITE = { title: "JerryHang 的个人博客", author: "JerryHang", repo: "h
 
 const WALLS = [
   { id: "clean", name: "纯色", img: "" },
-  { id: "skull", name: "花海", img: "assets/skull.jpg" },
-  { id: "arch", name: "樱", img: "assets/arch.jpg" },
-  { id: "banner", name: "草地", img: "assets/banner.jpg" }
+  { id: "skull", name: "花海", img: "/assets/skull.jpg" },
+  { id: "arch", name: "樱", img: "/assets/arch.jpg" },
+  { id: "banner", name: "草地", img: "/assets/banner.jpg" }
 ];
 
 const state = {
@@ -146,7 +146,7 @@ function mdToHtml(md) {
 async function loadPosts() {
   document.getElementById("post-scroll").innerHTML = '<div class="loading-tip">加载中…</div>';
   try {
-    const res = await fetch("posts.json", { cache: "no-store" });
+    const res = await fetch("/posts.json", { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     state.posts = Array.isArray(data) ? data : [];
@@ -156,6 +156,10 @@ async function loadPosts() {
   }
   renderAll();
   openFromHashIfAny();
+  if (window.__ARTICLE__) {
+    const idx = state.posts.findIndex(p => p.slug === window.__ARTICLE__ || p.title === window.__ARTICLE__);
+    if (idx >= 0 && state.nav !== "reader") selectArticle(idx);
+  }
 }
 function allCats() {
   const s = new Set(["全部"]);
@@ -190,8 +194,18 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
 }
+function articleUrl(p) {
+  return "/blog/" + (p.slug || p.title || "");
+}
 function copyPageLink() {
-  const url = location.origin + location.pathname + (location.hash || "");
+  let url;
+  if (window.__ARTICLE__ && state.articleIdx >= 0 && state.posts[state.articleIdx]) {
+    url = location.origin + articleUrl(state.posts[state.articleIdx]);
+  } else if (state.articleIdx >= 0 && state.posts[state.articleIdx]) {
+    url = location.origin + articleUrl(state.posts[state.articleIdx]);
+  } else {
+    url = location.origin + "/";
+  }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => showToast("链接已复制")).catch(() => showToast("复制失败"));
   } else {
@@ -344,7 +358,7 @@ function renderSide() {
 /* ---------- 视图 ---------- */
 function showView(name) {
   const doIt = () => {
-    if (name !== "reader") { try { history.replaceState(null, "", "#/"); } catch (e) { /* 忽略 */ } }
+    if (name !== "reader") { try { history.replaceState(null, "", "/"); } catch (e) { /* 忽略 */ } }
     $$(".view").forEach(v => v.classList.remove("on"));
     const v = document.getElementById("view-" + name);
     if (v) v.classList.add("on");
@@ -376,7 +390,7 @@ function selectArticle(idx) {
   if (sb) { sb.value = ""; sb.placeholder = "搜索本文…"; }
   toggleSidebar(false);
   renderSide();
-  try { history.replaceState(null, "", articleHash(p)); } catch (e) { /* 忽略 */ }
+  try { history.replaceState(null, "", articleUrl(p)); } catch (e) { /* 忽略 */ }
 }
 
 /* ---------- 主页文章长条 3/4 + 翻页 ---------- */
@@ -530,7 +544,7 @@ function renderAbout() {
   const totalWords = state.posts.reduce((n, p) => n + (p.body || "").replace(/\s/g, "").length, 0);
   document.getElementById("about-body").innerHTML =
     '<div class="a-hero">' +
-      '<div class="avatar"><img src="assets/avatar.jpg" alt=""></div>' +
+      '<div class="avatar"><img src="/assets/avatar.jpg" alt=""></div>' +
       '<div><h2>' + esc(SITE.title) + '</h2><p>记录与折腾 · 纯静态博客</p></div>' +
     '</div>' +
     '<div class="about-stats">' +
@@ -548,7 +562,7 @@ function renderAbout() {
     '</p>' +
     '<div class="a-links">' +
       '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">GitHub 仓库</a>' +
-      '<a class="link-btn" href="feed.xml" target="_blank" rel="noopener">RSS 订阅</a>' +
+      '<a class="link-btn" href="/feed.xml" target="_blank" rel="noopener">RSS 订阅</a>' +
       '<a class="link-btn" href="mailto:jerry@example.com">联系我</a>' +
     '</div>' +
     '<div class="sect" style="margin-top:16px;"><h3 style="font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">参考与友链</h3>' +

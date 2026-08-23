@@ -1,7 +1,8 @@
 //! blog_ctl —— 轻量级博客文章管理工具（纯标准库）
 //!
 //! 命令: new / list / build / push
-//! build 生成 posts.json（含 slug）、feed.xml（文章专属 hash 链接）、sitemap.xml、robots.txt
+//! build 生成 posts.json（含英文 slug）、feed.xml、sitemap.xml、robots.txt，
+//! 并为每篇文章生成独立静态页 blog/<slug>/index.html（真实路径直链）
 
 use std::env;
 use std::fs;
@@ -47,7 +48,7 @@ fn print_usage() {
     println!("blog_ctl —— 轻量级博客文章管理工具（纯 std，无第三方依赖）");
     println!("  blog_ctl new \"文章标题\"   新文章");
     println!("  blog_ctl list            列出文章");
-    println!("  blog_ctl build           生成 posts.json / feed.xml / sitemap.xml / robots.txt");
+    println!("  blog_ctl build           生成 posts.json / feed.xml / sitemap.xml / 独立文章页");
     println!("  blog_ctl push \"信息\"      先 build，再 git add/commit/push");
 }
 
@@ -103,6 +104,7 @@ fn cmd_build() {
     fs::write("feed.xml", build_feed(&posts)).expect("写 feed.xml 失败");
     fs::write("sitemap.xml", build_sitemap(&posts)).expect("写 sitemap.xml 失败");
     fs::write("robots.txt", "User-agent: *\nAllow: /\nSitemap: https://jerry-hang.blog/sitemap.xml\n").unwrap();
+    generate_pages(&posts);
     println!("✔ 已生成 posts.json（{} 篇）+ feed.xml + sitemap.xml + robots.txt", posts.len());
 }
 
@@ -135,6 +137,7 @@ fn parse_post(path: &Path) -> Option<Post> {
     let mut tags = Vec::new();
     let mut desc = String::new();
     let mut pinned = false;
+    let mut slug_meta = String::new();
     let mut body_start = 0usize;
     if lines.first().map(|l| l.trim()) == Some("---") {
         let mut i = 1usize;
@@ -150,6 +153,7 @@ fn parse_post(path: &Path) -> Option<Post> {
                     "tags" => tags = parse_list(val),
                     "desc" | "description" => desc = unquote(val),
                     "pinned" => pinned = unquote(val) == "true",
+                    "slug" => slug_meta = unquote(val),
                     _ => {}
                 }
             }
@@ -159,6 +163,9 @@ fn parse_post(path: &Path) -> Option<Post> {
     let mut slug = String::new();
     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
         slug = stem.to_string();
+        if !slug_meta.is_empty() {
+            slug = slug_meta.clone();
+        }
         if title.is_empty() && stem.len() > 11 && stem.as_bytes().get(4) == Some(&b'-') && stem.as_bytes().get(7) == Some(&b'-') {
             title = stem[11..].replace('-', " ");
         } else if title.is_empty() {
@@ -247,13 +254,38 @@ fn url_encode_path(s: &str) -> String {
     out
 }
 
+/// 生成每篇文章的独立静态页：blog/<slug>/index.html（真实路径直链，SEO 友好）
+fn generate_pages(posts: &[Post]) {
+    let tpl = match fs::read_to_string("index.html") {
+        Ok(t) => t,
+        Err(_) => { eprintln!("未找到 index.html 模板，跳过独立页生成"); return; }
+    };
+    let mut ok_w = 0;
+    for p in posts {
+        let dir = format!("blog/{}", p.slug);
+        if fs::create_dir_all(&dir).is_err() { continue; }
+        let inject = format!(
+            "<script>window.__ARTICLE__ = \"{}\";</script>\n",
+            xml_escape(&p.slug)
+        );
+        let marker = "<script src=\"/app.js";
+        let out = if let Some(i) = tpl.find(marker) {
+            format!("{}{}{}", &tpl[..i], inject, &tpl[i..])
+        } else {
+            tpl.clone()
+        };
+        if fs::write(format!("{dir}/index.html"), out).is_ok() { ok_w += 1; }
+    }
+    println!("✔ 已生成 {} 个独立文章页（blog/<slug>/）", ok_w);
+}
+
 fn build_feed(posts: &[Post]) -> String {
     let mut items = String::new();
     for (i, p) in posts.iter().enumerate() {
         items.push_str(&format!(
             "  <item><title>{t}</title><link>{link}</link><guid isPermaLink=\"false\">jb-{i}-{d}-{t}</guid><pubDate>{pub}</pubDate><description>{dsc}</description></item>\n",
             t = xml_escape(&p.title),
-            link = format!("{SITE}/#/post/{}", url_encode_path(&p.slug)),
+            link = format!("{SITE}/blog/{}/", url_encode_path(&p.slug)),
             i = i, d = xml_escape(&p.date), pub = rfc822_date(&p.date), dsc = xml_escape(&p.desc),
         ));
     }
@@ -269,7 +301,7 @@ fn build_sitemap(posts: &[Post]) -> String {
     for p in posts.iter() {
         urls.push_str(&format!(
             "  <url><loc>{link}</loc><lastmod>{dt}T00:00:00Z</lastmod><priority>0.8</priority></url>\n",
-            link = format!("{SITE}/#/post/{}", url_encode_path(&p.slug)), dt = p.date,
+            link = format!("{SITE}/blog/{}/", url_encode_path(&p.slug)), dt = p.date,
         ));
     }
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n{urls}</urlset>")
