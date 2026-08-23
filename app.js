@@ -154,13 +154,8 @@ function pinnedPosts() {
 
 /* ---------- 侧栏 ---------- */
 function toggleSidebar(force) {
-  if (window.innerWidth <= 720) {
-    const open = typeof force === "boolean" ? force : !document.body.classList.contains("m-side-open");
-    document.body.classList.toggle("m-side-open", open);
-  } else {
-    const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
-    document.getElementById("layout").classList.toggle("side-open", open);
-  }
+  const open = typeof force === "boolean" ? force : !document.getElementById("layout").classList.contains("side-open");
+  document.getElementById("layout").classList.toggle("side-open", open);
 }
 function renderChips() {
   const box = document.getElementById("side-chips");
@@ -213,7 +208,7 @@ function showView(name) {
   $$(".view").forEach(v => v.classList.remove("on"));
   const v = document.getElementById("view-" + name);
   if (v) v.classList.add("on");
-  $$(".tb-nav button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  $$(".tabbar button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   if (window.innerWidth <= 720) toggleSidebar(false);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
