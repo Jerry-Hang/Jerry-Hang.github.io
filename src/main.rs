@@ -1,8 +1,8 @@
 //! blog_ctl —— 轻量级博客文章管理工具（纯标准库）
 //!
 //! 命令: new / list / build / push
-//! build 生成 posts.json（含英文 slug）、feed.xml、sitemap.xml、robots.txt，
-//! 并为每篇文章生成独立静态页 blog/<slug>/index.html（真实路径直链）
+//! build 生成 posts.json（含 slug/cover）、feed.xml、sitemap.xml、robots.txt
+//! 并为每篇文章生成独立静态页 blog/<slug>/index.html
 
 use std::env;
 use std::fs;
@@ -22,6 +22,7 @@ struct Post {
     body: String,
     pinned: bool,
     slug: String,
+    cover: String,
 }
 
 fn main() {
@@ -94,11 +95,11 @@ fn cmd_build() {
     let posts = scan_posts();
     if posts.is_empty() { eprintln!("没有找到文章。"); }
     let items: Vec<String> = posts.iter().map(|p| format!(
-        "{{\"title\":\"{t}\",\"date\":\"{d}\",\"categories\":[{c}],\"tags\":[{g}],\"desc\":\"{e}\",\"body\":\"{b}\",\"pinned\":{p},\"slug\":\"{sl}\"}}",
+        "{{\"title\":\"{t}\",\"date\":\"{d}\",\"categories\":[{c}],\"tags\":[{g}],\"desc\":\"{e}\",\"body\":\"{b}\",\"pinned\":{p},\"slug\":\"{sl}\",\"cover\":\"{cv}\"}}",
         t = json_escape(&p.title), d = json_escape(&p.date),
         c = json_str_array(&p.categories), g = json_str_array(&p.tags),
         e = json_escape(&p.desc), b = json_escape(&p.body),
-        p = if p.pinned { "true" } else { "false" }, sl = json_escape(&p.slug),
+        p = if p.pinned { "true" } else { "false" }, sl = json_escape(&p.slug), cv = json_escape(&p.cover),
     )).collect();
     fs::write("posts.json", format!("[{}]", items.join(","))).expect("写 posts.json 失败");
     fs::write("feed.xml", build_feed(&posts)).expect("写 feed.xml 失败");
@@ -138,6 +139,7 @@ fn parse_post(path: &Path) -> Option<Post> {
     let mut desc = String::new();
     let mut pinned = false;
     let mut slug_meta = String::new();
+    let mut cover = String::new();
     let mut body_start = 0usize;
     if lines.first().map(|l| l.trim()) == Some("---") {
         let mut i = 1usize;
@@ -154,6 +156,7 @@ fn parse_post(path: &Path) -> Option<Post> {
                     "desc" | "description" => desc = unquote(val),
                     "pinned" => pinned = unquote(val) == "true",
                     "slug" => slug_meta = unquote(val),
+                    "cover" => cover = unquote(val),
                     _ => {}
                 }
             }
@@ -191,7 +194,7 @@ fn parse_post(path: &Path) -> Option<Post> {
             if !t.is_empty() { desc = if t.len() > 120 { t[..120].to_string() } else { t }; }
         }
     }
-    Some(Post { title, date, categories, tags, desc, body, pinned, slug })
+    Some(Post { title, date, categories, tags, desc, body, pinned, slug, cover })
 }
 
 fn unquote(s: &str) -> String {
@@ -254,7 +257,7 @@ fn url_encode_path(s: &str) -> String {
     out
 }
 
-/// 生成每篇文章的独立静态页：blog/<slug>/index.html（真实路径直链，SEO 友好）
+/// 生成每篇文章的独立静态页：blog/<slug>/index.html
 fn generate_pages(posts: &[Post]) {
     let tpl = match fs::read_to_string("index.html") {
         Ok(t) => t,

@@ -410,14 +410,17 @@ function renderHome() {
       const idx = state.posts.indexOf(p);
       const words = (p.body || "").replace(/\s/g, "").length;
       const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
-      return '<button class="home-item" data-idx="' + idx + '">' +
-        '<span class="hi-date">' + esc(p.date || "") + '</span>' +
-        '<span class="hi-main">' +
+      const cats = (p.categories || []).slice(0, 1).map(c => '<span class="hi-cats">' + esc(c) + '</span>').join("");
+      return '<button class="home-item' + (p.cover ? "" : " no-cover") + '" data-idx="' + idx + '">' +
+        (p.cover ? '<img class="hi-cover" src="' + esc(p.cover) + '" alt="" loading="lazy">' : '') +
+        '<span class="hi-body">' +
+          '<span class="hi-top"><span class="hi-date">' + esc(p.date || "") + '</span>' + cats + '</span>' +
           '<span class="hi-title">' + esc(p.title) + '</span>' +
           (p.desc ? '<span class="hi-excerpt">' + esc(p.desc) + '</span>' : '') +
+          '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字 · ' + readMinutes(p) + ' 分钟</span>' +
+            '<span class="hi-arrow">继续阅读 ›</span>' +
+          '</span>' +
         '</span>' +
-        '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字 · ' + readMinutes(p) + ' 分钟</span></span>' +
-        '<span class="hi-arrow">›</span>' +
       '</button>';
     }).join("");
   }

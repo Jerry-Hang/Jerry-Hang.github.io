@@ -2,6 +2,7 @@
 layout: post
 title: "Jerry-Hang的自述史"
 slug: history
+cover: /assets/skull.jpg
 date: 2026-08-24
 categories: [随笔]
 tags: [自述史, 成长]
