@@ -11,16 +11,26 @@ const esc = s => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"
 
 const SITE = { title: "JerryHang 的个人博客", author: "JerryHang", repo: "https://github.com/Jerry-Hang/Jerry-Hang.github.io" };
 
+/* 壁纸按方向区分：横版壁纸（桌面/平板/横屏）与竖版壁纸（手机竖屏） */
 const WALLS = [
-  { id: "clean", name: "纯色", img: "" },
-  { id: "skull", name: "花海", img: "/assets/skull.jpg" },
-  { id: "arch", name: "樱", img: "/assets/arch.jpg" },
-  { id: "banner", name: "草地", img: "/assets/banner.jpg" }
+  { id: "clean", name: "纯色", img: "", orient: "any" },
+  { id: "skull", name: "花海", img: "/assets/skull.jpg", orient: "portrait" },
+  { id: "arch", name: "樱", img: "/assets/arch.jpg", orient: "portrait" },
+  { id: "bg5", name: "雾", img: "/assets/bg5.jpg", orient: "portrait" },
+  { id: "bg6", name: "夜", img: "/assets/bg6.jpg", orient: "portrait" },
+  { id: "banner", name: "草地", img: "/assets/banner.jpg", orient: "landscape" },
+  { id: "avatar3", name: "红伞", img: "/assets/avatar3.jpg", orient: "landscape" },
+  { id: "long2", name: "原野", img: "/assets/long2.jpg", orient: "landscape" }
 ];
+function isLandscape() { return window.innerWidth > window.innerHeight; }
+function activeWalls() {
+  return WALLS.filter(w => w.orient === "any" || (isLandscape() ? w.orient === "landscape" : w.orient === "portrait"));
+}
+const DEFAULT_WALL = () => (isLandscape() ? "banner" : "skull");
 
 const state = {
   theme: localStorage.getItem("jb_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
-  wall: localStorage.getItem("jb_wall2") || "skull",
+  wall: localStorage.getItem("jb_wall2") || DEFAULT_WALL(),
   posts: [],
   q: "",
   sideMode: "cat",
@@ -41,7 +51,11 @@ function applyFontScale() {
 }
 
 function applyWall() {
-  const w = WALLS.find(x => x.id === state.wall) || WALLS[0];
+  let w = WALLS.find(x => x.id === state.wall);
+  if (!w || (w.orient !== "any" && (isLandscape() ? w.orient !== "landscape" : w.orient !== "portrait"))) {
+    state.wall = DEFAULT_WALL();
+    w = WALLS.find(x => x.id === state.wall);
+  }
   const el = document.getElementById("wallpaper");
   if (el) el.style.backgroundImage = w.img ? "url('" + w.img + "')" : "none";
   localStorage.setItem("jb_wall2", state.wall);
@@ -537,46 +551,46 @@ function renderArchive() {
 
 /* ---------- 关于 ---------- */
 function renderAbout() {
-  const tags = new Set();
-  const cats = new Set();
+  const tagsAll = new Set();
+  const catsAll = new Set();
   state.posts.forEach(p => {
-    (p.tags || []).forEach(t => tags.add(t));
-    (p.categories || []).forEach(c => cats.add(c));
+    (p.tags || []).forEach(t => tagsAll.add(t));
+    (p.categories || []).forEach(c => catsAll.add(c));
   });
-  const latest = state.posts.length ? state.posts[0].date : "—";
   const totalWords = state.posts.reduce((n, p) => n + (p.body || "").replace(/\s/g, "").length, 0);
+  const catChips = Array.from(catsAll).map(c => '<span class="side-cap">' + esc(c) + '</span>').join("");
+  const tagChips = Array.from(tagsAll).map(t => '<span class="side-cap">' + esc(t) + '</span>').join("");
   document.getElementById("about-body").innerHTML =
-    '<div class="a-hero">' +
-      '<div class="avatar"><img src="/assets/avatar.jpg" alt=""></div>' +
-      '<div><h2>' + esc(SITE.title) + '</h2><p>记录与折腾 · 纯静态博客</p></div>' +
-    '</div>' +
-    '<div class="about-stats">' +
-      '<div class="stat"><b>' + state.posts.length + '</b><span>文章</span></div>' +
-      '<div class="stat"><b>' + cats.size + '</b><span>分类</span></div>' +
-      '<div class="stat"><b>' + tags.size + '</b><span>标签</span></div>' +
-      '<div class="stat"><b>' + totalWords.toLocaleString() + '</b><span>总字数</span></div>' +
-    '</div>' +
-    '<div class="sect"><h3 style="font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;">壁纸</h3>' +
-      '<div class="wall-grid" id="wall-grid"></div>' +
-    '</div>' +
-    '<p style="font-size:13px;line-height:1.8;color:var(--text-soft)">' +
-      '一个用 Rust 命令行工具与原生 HTML / CSS / JS 打造的胶囊目录静态博客。' +
-      '左侧目录栏像抽屉一样展开：搜索、筛选、滚动胶囊列表；右侧是置顶的精选内容。' +
-    '</p>' +
-    '<div class="a-links">' +
-      '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">GitHub 仓库</a>' +
-      '<a class="link-btn" href="/feed.xml" target="_blank" rel="noopener">RSS 订阅</a>' +
-      '<a class="link-btn" href="mailto:jerry@example.com">联系我</a>' +
-    '</div>' +
-    '<div class="sect" style="margin-top:16px;"><h3 style="font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">参考与友链</h3>' +
-      '<div class="a-links">' +
-        '<a class="link-btn" href="https://github.com/Eric-Terminal/cf-astro-blog" target="_blank" rel="noopener">cf-astro-blog 参考项目</a>' +
+    '<div class="about-layout">' +
+      '<aside class="about-side">' +
+        '<div class="avatar"><img src="/assets/avatar.jpg" alt=""></div>' +
+        '<h2>' + esc(SITE.title) + '</h2>' +
+        '<p class="a-sub">记录与折腾 · 纯静态博客</p>' +
+        '<div class="sect"><h3 class="sect-t">分类</h3><div class="cap-wrap">' + catChips + '</div></div>' +
+        '<div class="sect"><h3 class="sect-t">标签</h3><div class="cap-wrap">' + tagChips + '</div></div>' +
+        '<div class="a-links">' +
+          '<a class="link-btn" href="' + SITE.repo + '" target="_blank" rel="noopener">GitHub 仓库</a>' +
+          '<a class="link-btn" href="/feed.xml" target="_blank" rel="noopener">RSS 订阅</a>' +
+          '<a class="link-btn" href="mailto:jerry@example.com">联系我</a>' +
+        '</div>' +
+      '</aside>' +
+      '<div class="about-main">' +
+        '<div class="about-stats">' +
+          '<div class="stat"><b>' + state.posts.length + '</b><span>文章</span></div>' +
+          '<div class="stat"><b>' + catsAll.size + '</b><span>分类</span></div>' +
+          '<div class="stat"><b>' + tagsAll.size + '</b><span>标签</span></div>' +
+          '<div class="stat"><b>' + totalWords.toLocaleString() + '</b><span>总字数</span></div>' +
+        '</div>' +
+        '<div class="sect"><h3 class="sect-t">壁纸（' + (isLandscape() ? "横版" : "竖版") + '）</h3>' +
+          '<div class="wall-grid" id="wall-grid"></div>' +
+        '</div>' +
+        '<p class="a-desc">一个用 Rust 命令行工具与原生 HTML / CSS / JS 打造的胶囊目录静态博客。左侧目录栏像抽屉一样展开：搜索、筛选、滚动胶囊列表；右侧是置顶的精选内容。</p>' +
+        '<p class="a-foot">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 记录与折腾</p>' +
       '</div>' +
-    '</div>' +
-    '<p style="margin-top:16px;font-size:11.5px;color:var(--text-faint);text-align:center">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 记录与折腾</p>';
+    '</div>';
   const wg = document.getElementById("wall-grid");
   if (wg) {
-    wg.innerHTML = WALLS.map(w =>
+    wg.innerHTML = activeWalls().map(w =>
       '<button class="wall-thumb' + (w.id === state.wall ? " on" : "") + (w.img ? "" : " clean") + '" data-wall="' + w.id + '"' +
       (w.img ? ' style="background-image:url(&quot;' + w.img + '&quot;)"' : '') + '>' +
         '<span class="wt-name">' + esc(w.name) + '</span>' +
