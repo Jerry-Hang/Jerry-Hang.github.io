@@ -125,7 +125,7 @@ input { font-family: inherit; }
 #tb-tabs button.on::after { width: 16px; }
 .top-area.compact #tb-tabs { max-height: 0; opacity: 0; gap: 0; }
 #tb-theme { justify-self: end; }
-#layout { padding-top: 44px; }
+#layout { padding-top: calc(84px + env(safe-area-inset-top)); }
 #tb-theme svg { width: 16px; height: 16px; }
 .tabbar {
   display: flex; align-items: center; justify-content: center; gap: 34px;
@@ -572,7 +572,7 @@ body.dark .home-item::after { background: radial-gradient(300px circle at var(--
 body.dark #wall-shade { background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55) 60%, rgba(0,0,0,.7)); }
 body.reading #wall-shade { background: linear-gradient(180deg, rgba(10,12,18,.62), rgba(10,12,18,.72) 60%, rgba(10,12,18,.78)); }
 body.reading:not(.dark) #wall-shade { background: linear-gradient(180deg, rgba(244,246,250,.9), rgba(244,246,250,.94)); }
-#desktop, #layout, #content, .top-area { position: relative; z-index: 2; }
+#desktop, #layout, #content { position: relative; z-index: 2; }
 
 /* 卡片毛玻璃透视壁纸 */
 .home-item, .about-card, .pill, .pin-card { backdrop-filter: blur(16px) saturate(1.25); -webkit-backdrop-filter: blur(16px) saturate(1.25); }
