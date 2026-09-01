@@ -61,16 +61,27 @@ blog_server_rust/
     ├── assets/            # 图片、壁纸等素材
     ├── blog/              # 静态文章目录页
     ├── _posts/            # Markdown 文章源
-    ├── posts.json         # 文章数据（服务器运行时动态生成/覆盖）
     ├── CNAME 404.html robots.txt sitemap.xml feed.xml .nojekyll
     └── README.md          # 前端自身的说明
 ```
+
+> 说明：`frontend/posts.json` 由服务器在运行时根据 SQLite 动态生成，故**不入库**；克隆仓库后，服务器首次启动会自动写出。
 
 **各文件职责**
 - `main.rs`：读取 `BLOG_*` 环境变量，`sched_setaffinity` 把主线程锁到指定 CPU（所有子线程继承），再以 `worker_threads` 构建 Tokio 多线程运行时并 `block_on(server::run)`。
 - `server.rs`：`Config` 与 `load_config`；`Gate`（原子并发门控 + 内存熔断）；外部/本地 handler；请求日志中间件（内联在 handler 中）；`check_auth` 双会话；`/api/*` 与 `/api/admin/*`；内嵌后台 `ADMIN_HTML`（含图表 tooltip、来源分析弹层）。
 - `db.rs`：`Db` 持有 `Mutex<Connection>`；文章 CRUD、搜索、统计；请求日志写入与查询；会话创建/校验；`render_markdown`（pulldown + `sanitize_html`）。
 - `sha256.rs` / `base64.rs`：无第三方加密依赖，纯标准库实现，用于密码哈希与 HTTP Basic 解析。
+
+---
+
+## 持续集成（CI）
+
+仓库内置 [GitHub Actions](.github/workflows/ci.yml)：在 push/PR 到 `main` 时自动执行
+
+- `cargo build --locked --release`（构建）
+- `cargo clippy --all-targets -- -W clippy::all`（静态检查，警告不阻断）
+- `cargo test --locked`（测试）
 
 ---
 
