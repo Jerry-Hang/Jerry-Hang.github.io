@@ -20,3 +20,4 @@
 # Editor/OS
 *.swp
 .DS_Store
+/frontend/target/

@@ -42,18 +42,28 @@
 
 ## 项目文件结构树解析
 
-```
+```text
 blog_server_rust/
 ├── Cargo.toml            # 依赖与二进制定义（tokio / axum / rusqlite / pulldown-cmark / libc …）
 ├── Cargo.lock            # 锁定依赖版本（保证可复现构建）
 ├── README.md             # 本项目说明文档
+├── LICENSE               # MIT 开源许可
 ├── .gitignore            # 排除 target/、config.toml、blog.db*、日志与本地脚本（防泄密）
-└── src/
-    ├── main.rs           # 入口：解析 env、sched_setaffinity 绑核、构建 multi-thread Tokio 运行时
-    ├── server.rs         # 核心：双端口 axum 服务、请求日志、会话认证、管理 API、Admin 仪表盘 HTML
-    ├── db.rs             # SQLite 层：posts / request_logs / sessions 表，Markdown 渲染与 XSS 净化
-    ├── sha256.rs         # 纯 Rust SHA-256（Basic Auth 密码校验）
-    └── base64.rs         # 纯 Rust Base64 解码（解析 Authorization: Basic）
+├── src/                  # 后端（Rust）
+│   ├── main.rs           # 入口：解析 env、sched_setaffinity 绑核、构建 multi-thread Tokio 运行时
+│   ├── server.rs         # 核心：双端口 axum 服务、请求日志、会话认证、管理 API、Admin 仪表盘 HTML
+│   ├── db.rs             # SQLite 层：posts / request_logs / sessions 表，Markdown 渲染与 XSS 净化
+│   ├── sha256.rs         # 纯 Rust SHA-256（Basic Auth 密码校验）
+│   └── base64.rs         # 纯 Rust Base64 解码（解析 Authorization: Basic）
+└── frontend/              # 静态前端（源自 blog_ctl，由服务器经 BLOG_ROOT 读取）
+    ├── index.html         # 前台 SPA（iOS 锁屏 + Win11 桌面风 + 毛玻璃/极光）
+    ├── app.js             # 前端逻辑（纯原生 JS）
+    ├── assets/            # 图片、壁纸等素材
+    ├── blog/              # 静态文章目录页
+    ├── _posts/            # Markdown 文章源
+    ├── posts.json         # 文章数据（服务器运行时动态生成/覆盖）
+    ├── CNAME 404.html robots.txt sitemap.xml feed.xml .nojekyll
+    └── README.md          # 前端自身的说明
 ```
 
 **各文件职责**
