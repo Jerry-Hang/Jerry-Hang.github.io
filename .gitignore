@@ -1,1 +1,22 @@
+# Build artifacts
 /target
+
+# Secrets & runtime data (NEVER commit)
+/config.toml
+**/config.toml
+/blog.db
+/blog.db-*
+*.db
+*.db-wal
+*.db-shm
+
+# Logs & temp files
+*.log
+*.pid
+
+# Local dev/bench scripts that may embed credentials
+*.py
+
+# Editor/OS
+*.swp
+.DS_Store

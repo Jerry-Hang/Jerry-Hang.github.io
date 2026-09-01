@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://jerry-hang.blog/sitemap.xml

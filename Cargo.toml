@@ -1,14 +1,18 @@
 [package]
-name = "blog_ctl"
+name = "blog_server_rust"
 version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "blog_ctl"
+name = "blog_server"
 path = "src/main.rs"
 
-[[bin]]
-name = "blog_hub"
-path = "src/bin/blog_hub.rs"
-
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+bytes = "1"
+libc = "0.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+pulldown-cmark = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
