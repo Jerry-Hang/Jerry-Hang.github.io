@@ -1,0 +1,28 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 看门狗：每 15s 检查本地 8080；若本地 OK 但公网异常则重启 cloudflared；>5MB 滚动日志
+# 安装到 $PREFIX/var/service/blog_health/run，并 sv-enable blog_health
+export SVDIR=/data/data/com.termux/files/usr/var/service
+export PREFIX=/data/data/com.termux/files/usr
+DOMAIN="${DOMAIN:-jerry-hang.blog}"
+LOG="${LOG:-$HOME/blog_server_async.log}"
+termux-wake-lock || true
+while true; do
+  sleep 15
+  code=$(curl -s -o /dev/null --max-time 5 -w '%{http_code}' http://127.0.0.1:8080/ 2>/dev/null)
+  if [ "$code" != "200" ]; then sv restart blog_server; fi
+  if [ "$code" = "200" ]; then
+    tcode=$(curl -s -o /dev/null --max-time 8 -w '%{http_code}' https://$DOMAIN 2>/dev/null)
+    case "$tcode" in
+      200|401) : ;;
+      *) sv restart cloudflared ;;
+    esac
+  fi
+  if [ -f "$LOG" ]; then
+    sz=$(stat -c%s "$LOG" 2>/dev/null || wc -c < "$LOG" | tr -d ' ')
+    if [ "${sz:-0}" -gt 5242880 ]; then
+      cp "$LOG" "$LOG.$(date +%s)"
+      : > "$LOG"
+      ls -1t "$LOG".* 2>/dev/null | tail -n +6 | xargs -r rm -f
+    fi
+  fi
+done

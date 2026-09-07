@@ -153,7 +153,20 @@ cloudflared tunnel run myblog
 
 ---
 
+## 持久化与自愈（runit + Termux:Boot）
+
+仓库提供 [`deploy/`](deploy) 下的可复用脚本，把服务做成“进程被杀自动重启 + 每 15s 自检 + 开机自启”：
+
+- `deploy/blog_server.run`：runit 服务脚本（含 `termux-wake-lock`）。安装到 `$PREFIX/var/service/blog_server/run` 并 `sv-enable blog_server`。
+- `deploy/blog_health.run`：看门狗，每 15s 检查本地 `8080`；若本地 OK 但公网 `https://jerry-hang.blog` 异常（如 530）则重启 `cloudflared`；日志 >5MB 自动滚动（保留最近 5 份）。安装到 `$PREFIX/var/service/blog_health/run` 并 `sv-enable blog_health`。
+- `deploy/termux-boot-start.sh`：开机脚本，放到 `~/.termux/boot/start_blog.sh`（需装 Termux:Boot App，并允许其自启动/后台/电池不受限）。
+
+机制：runit 负责“进程死了立刻拉起”；看门狗负责“端口/隧道异常 15s 内恢复”；Termux:Boot 负责“手机重启后自动拉起来”，并发送“博客已启动”通知。
+
+---
+
 ## 常见问题与处理
+
 
 - **编译被 OOM 杀**：用 `cargo build --release --jobs 1`，或临时关闭其他大进程。
 - **端口被占用**：确认旧进程已退出；`sv stop blog_server` 或 `kill $(pgrep -f blog_server)` 后重启。
