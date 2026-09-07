@@ -720,6 +720,15 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
 #tb-theme{width:34px;height:34px;flex:0 0 auto}
 .tb-admin{padding:6px 10px;font-size:12px;flex:0 0 auto}
 @media (max-width:520px){#tb-brand .brand-text{font-size:12px;max-width:84px}#tb-tabs{gap:6px}#tb-tabs button{font-size:12px;padding:3px 5px}.tb-admin{font-size:11px;padding:5px 8px}}
+/* UI 精修：卡片/正文/间距 */
+.pill{background:linear-gradient(150deg,rgba(255,255,255,.12),rgba(255,255,255,.05)) !important;}
+.pill::before{background:radial-gradient(circle,rgba(125,211,252,.45),transparent 70%) !important;}
+.reader-head,.md-body,#r-body{max-width:920px;margin-left:auto;margin-right:auto;width:100%;}
+#r-body{line-height:1.85;font-size:15px;letter-spacing:.01em;}
+#r-body img{max-width:100%;border-radius:14px;}
+.home-card,.about-card{transition:transform .25s,box-shadow .25s;}
+.home-card:hover,.about-card:hover{transform:translateY(-3px);}
+#post-scroll,#content{max-width:1200px;margin-left:auto;margin-right:auto;}
 </style>
 </head>
 <body>
