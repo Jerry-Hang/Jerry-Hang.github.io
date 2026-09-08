@@ -715,10 +715,10 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
 #topbar{gap:6px;padding-right:6px}
 #tb-brand img{width:24px;height:24px;min-width:24px}
 #tb-brand .brand-text{font-size:13px;max-width:110px}
-#tb-tabs{gap:8px;margin-left:0;flex:0 1 auto}
+#tb-tabs{gap:6px;margin-left:0;flex:0 1 auto}
 #tb-tabs button{padding:4px 6px;font-size:13px}
-#tb-theme{width:34px;height:34px;flex:0 0 auto}
-.tb-admin{padding:6px 10px;font-size:12px;flex:0 0 auto}
+#tb-theme{width:30px;height:30px;flex:0 0 auto}
+.tb-admin{padding:5px 9px;font-size:11px;flex:0 0 auto}
 @media (max-width:520px){#tb-brand .brand-text{font-size:12px;max-width:84px}#tb-tabs{gap:6px}#tb-tabs button{font-size:12px;padding:3px 5px}.tb-admin{font-size:11px;padding:5px 8px}}
 /* UI 精修：卡片/正文/间距 */
 .pill{background:linear-gradient(150deg,rgba(255,255,255,.12),rgba(255,255,255,.05)) !important;}
@@ -848,7 +848,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .menubar,.taskbar,.top-bar,#taskbar,#menubar{backdrop-filter:blur(14px) saturate(160%) !important;-webkit-backdrop-filter:blur(14px) saturate(160%) !important;background:rgba(8,12,24,.42) !important;border-bottom:1px solid rgba(255,255,255,.08) !important;transition:background .3s ease,backdrop-filter .3s ease !important;}
 .menubar.scrolled,.taskbar.scrolled,.top-bar.scrolled,#taskbar.scrolled,#menubar.scrolled{background:rgba(6,9,18,.68) !important;}
 /* MANUAL LIGHT (body:not(.dark) — set by #tb-theme / jb_theme, independent of prefers-color-scheme) */
-body:not(.dark){background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.20),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.16),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.12),transparent 55%),linear-gradient(180deg,#edf1fb,#dfe5f5) !important;}
+body:not(.dark){background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.42),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.34),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.24),transparent 55%),linear-gradient(180deg,#cfdcf4,#c2ccf0) !important;}
 body:not(.dark) .pill{background:rgba(255,255,255,.62) !important;border-color:rgba(0,0,0,.08) !important;box-shadow:0 10px 40px rgba(30,41,59,.14) !important;}
 body:not(.dark) .pill:hover{background:rgba(255,255,255,.78) !important;}
 body:not(.dark) .reader-head,body:not(.dark) .reader-foot,body:not(.dark) .r-fontbar,body:not(.dark) #r-body,body:not(.dark) .home-list .home-card,body:not(.dark) .about-card,body:not(.dark) .about-main{background:rgba(255,255,255,.62) !important;border-color:rgba(0,0,0,.08) !important;box-shadow:0 10px 40px rgba(30,41,59,.14) !important;}

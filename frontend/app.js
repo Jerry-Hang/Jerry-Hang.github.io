@@ -29,7 +29,7 @@ function activeWalls() {
 const DEFAULT_WALL = () => (isLandscape() ? "banner" : "skull");
 
 const state = {
-  theme: localStorage.getItem("jb_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
+  theme: localStorage.getItem("jb_theme") || "dark",
   wall: localStorage.getItem("jb_wall2") || DEFAULT_WALL(),
   posts: [],
   q: "",
