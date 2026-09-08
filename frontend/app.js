@@ -26,7 +26,7 @@ function isLandscape() { return window.innerWidth > window.innerHeight; }
 function activeWalls() {
   return WALLS.filter(w => w.orient === "any" || (isLandscape() ? w.orient === "landscape" : w.orient === "portrait"));
 }
-const DEFAULT_WALL = () => (isLandscape() ? "banner" : "skull");
+const DEFAULT_WALL = () => "clean";
 
 const state = {
   theme: localStorage.getItem("jb_theme") || "dark",
