@@ -1,9 +1,22 @@
-﻿# Windows 部署说明（博客服务器）
+# Windows 部署说明（博客服务器）
 
 本目录是 **Windows 版部署脚本**，对应原有的 Termux/runit 方案（`blog_server.run` / `blog_health.run` / `termux-boot-start.sh`）。
 
 **部署状态：✅ 已完成（2026-09-24）**
 **补充完善：✅ 2026-09-26**（公网访问 + 绑核优化 + 日志保留策略，见文末「2026-09-26 补充」）
+
+> ## 📚 相关文档
+>
+> | 文档 | 内容 |
+> |---|---|
+> | [README.md](../README.md) | 项目总览、架构、配置项、常见问题 |
+> | [README.en.md](../README.en.md) | English README |
+> | [docs/部署-Termux安卓.md](../docs/部署-Termux安卓.md) | 手机 Linux / Termux 部署（本文的对应方案） |
+> | [docs/CLOUDFLARE_TUNNEL.md](../docs/CLOUDFLARE_TUNNEL.md) | 隧道完整教程 + 三个坑的详细原理 |
+> | [docs/SECURITY.md](../docs/SECURITY.md) | 安全模型、**哪些文件绝不能提交**、脱敏实战 |
+>
+> ⚠️ **本机端口是 8090 / 8091**（不是代码默认的 8080 / 8081），
+> 原因见下文「端口为什么是 8090 / 8091」。
 
 ---
 
@@ -323,15 +336,28 @@ Start-ScheduledTask -TaskName JerryHang-Blog
 ```
 
 **想从公网访问**
-需要 `cloudflared` 隧道（和手机端方案一样）：
+需要 `cloudflared` 隧道（和手机端方案一样）。**完整教程见
+[docs/CLOUDFLARE_TUNNEL.md](../docs/CLOUDFLARE_TUNNEL.md)**，最短路径：
+
 ```powershell
 winget install Cloudflare.cloudflared
-cloudflared tunnel login
-cloudflared tunnel create myblog
-cloudflared tunnel route dns myblog your.domain
-cloudflared tunnel run myblog
 ```
-隧道自身也需要做成服务才能常驻，可以用 `cloudflared service install`。
+
+然后**不要**用 `cloudflared tunnel login`（本机不可用，原因见本文档
+「弯路 1」），改用 API Token 方案：
+
+```powershell
+$env:CF_API_TOKEN = "你的token"      # 权限：Tunnel 编辑 + DNS 编辑
+cd D:\3D_Work\Blog\deploy
+.\配置隧道.ps1
+```
+
+> ⚠️ **隧道常驻绝对不要用 `cloudflared service install`。**
+> 它装出来的服务以 `LocalSystem` 运行，读不到你的 `~/.cloudflared/config.yml`，
+> 结果公网一直 **530**。详见下面「弯路 3」。
+> **正确做法是注册计划任务 `Tunnel-Blog`、以用户账户运行**，见
+> [docs/CLOUDFLARE_TUNNEL.md](../docs/CLOUDFLARE_TUNNEL.md) 第 5 节。
+
 
 ---
 
@@ -398,11 +424,36 @@ Select-String -Path D:\3D_Work\Blog\logs\server.err.log -Pattern 'pruned'
 
 ## 三、备份
 
-改动前的数据库已备份：
+> **2026-09-26 晚更新：这两个备份文件已经不存在了。**
+
+改动前曾备份过 `blog.db.bak-before-prune` 和 `blog.db.bak-scope`。
+它们在 2026-09-26 的仓库脱敏中被处理掉，原因见
+[docs/SECURITY.md](../docs/SECURITY.md)：
+
+**它们被误提交进了 Git 的 15 个提交里。** 数据库备份包含
+`request_logs`（全部访客 IP）和 `sessions`（有效登录 token），
+一旦推送就等于公开泄露。
+
+处理方式：
+
+1. 用 `git filter-branch --index-filter` 从**全部历史**中移除这两个文件
+2. 清理 `refs/original/*`、reflog，然后 `git gc --prune=now`
+3. 验证 `git cat-file -t <旧提交SHA>` 返回 `fatal: Not a valid object name`
+4. 在 `.gitignore` 里补上 `*.db.bak*`、`*.bak`、`*.bak-*`
+   （**原来的 `*.db` 规则抓不住 `.bak-before-prune` 这种命名**）
+
+**现在 `blog.db` 的备份策略**：不要再用 `blog.db.bak-*` 这种名字放进仓库目录。
+放到仓库外面，或者用带时间戳的独立目录：
+
+```powershell
+# 推荐：备份到仓库目录之外
+$bak = "D:\BlogBackups\blog-$(Get-Date -Format 'yyyyMMdd_HHmmss').db"
+New-Item -ItemType Directory -Force -Path (Split-Path $bak) | Out-Null
+Copy-Item D:\3D_Work\Blog\blog.db $bak
 ```
-D:\3D_Work\Blog\blog.db.bak-before-prune
-```
-确认新版本稳定运行后可以删掉。
+
+> SQLite 开着 WAL，**热备份要连 `-wal` 和 `-shm` 一起拷**，
+> 或者用 `sqlite3 blog.db ".backup '备份路径'"` 更稳妥。
 
 ## 四、重新编译的注意事项
 
