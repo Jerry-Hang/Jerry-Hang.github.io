@@ -26,3 +26,7 @@
 /_预览/
 /_shot.mjs
 
+
+# 登录流程验证脚本（本地调试）
+/_verify_login.mjs
+
