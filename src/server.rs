@@ -668,8 +668,20 @@ async fn serve_static(root_canon: &Path, target: &str) -> Response {
                 );
                 resp.headers_mut()
                     .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+                // HTML 不缓存：页面里内联了 CSS 和 JS（重建后会变），
+                // 如果给长缓存，用户会一直拿到旧页面 —— 实际踩过：
+                // 改了前端里硬编码的后台端口，浏览器仍用缓存里的旧地址。
+                // 静态资源（图片/字体）仍走长缓存，JS/CSS 靠 URL 上的版本号刷新。
+                let cc = if ctype.starts_with("text/html") {
+                    "no-cache, must-revalidate"
+                } else if matches_ext(target, &["js", "css"]) {
+                    // 这两个也内联/被内联进页面，同样给短缓存
+                    "no-cache, must-revalidate"
+                } else {
+                    CACHE_CONTROL
+                };
                 resp.headers_mut()
-                    .insert(header::CACHE_CONTROL, HeaderValue::from_static(CACHE_CONTROL));
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
                 resp.headers_mut()
                     .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
                 resp
@@ -746,8 +758,19 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     r == 0
 }
 
-fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {
-    let rel = sanitize_relative_path(raw_target)?;
+/// 判断请求路径的扩展名是否在给定列表里（用于决定缓存策略）。
+/// 同时看原始 URL 和解析后的文件路径，因为 `/blog/foo/` 这种目录索引
+/// 在 URL 上没有扩展名，实际返回的是 index.html。
+fn matches_ext(target: &str, exts: &[&str]) -> bool {
+    let ext = Path::new(target)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    exts.iter().any(|e| *e == ext)
+}
+
+fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {    let rel = sanitize_relative_path(raw_target)?;
     let full = if rel.is_empty() {
         root_canon.to_path_buf()
     } else {
