@@ -2,13 +2,28 @@
 /target
 
 # Secrets & runtime data (NEVER commit)
+#
+# config.toml holds username + password_sha256.
+# blog.db* holds request_logs (visitor IPs), sessions (live login tokens)
+# and post bodies -- a single mistake here leaks every visitor's IP and
+# lets anyone replay an admin session.
+#
+# If one ever slips in, deleting the file is NOT enough: it stays readable
+# in the old commits.  Rewrite history instead:
+#   git filter-branch --index-filter \
+#     "git rm -r --cached --ignore-unmatch '*.db' '*.db-*' '*.bak'" -- --all
+# then drop refs/original/*, expire the reflog and gc --prune=now.
 /config.toml
 **/config.toml
 /blog.db
 /blog.db-*
 *.db
+*.db-*
+*.db.bak*
 *.db-wal
 *.db-shm
+*.bak
+*.bak-*
 
 # Logs & temp files
 *.log
@@ -36,4 +51,10 @@
 /_patch_*.mjs
 /_shot_*.mjs
 /_verify_*.mjs
+/_scrub_history.ps1
+
+# 本地资料 / 第三方参考（不入库）
+/_backup_blogpages/
+/_参考_*/
+/_audit_repo.py
 
