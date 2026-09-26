@@ -7,12 +7,33 @@ edition = "2024"
 name = "blog_server"
 path = "src/main.rs"
 
+# 一次性导入工具：把 frontend/_posts/*.md 导入 blog.db
+# 复用 db.rs，保证 Markdown 渲染与 HTML 净化结果与服务端完全一致。
+[[bin]]
+name = "import_posts"
+path = "src/bin/import_posts.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = "0.7"
 bytes = "1"
-libc = "0.2"
 rusqlite = { version = "0.31", features = ["bundled"] }
 pulldown-cmark = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# 跨平台随机数（取代 Linux 专用的 /dev/urandom）
+getrandom = "0.2"
+
+# ---- 平台专属依赖 ----
+# Linux/Android/Termux：CPU 绑核用 libc
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Windows：进程亲和性 + 内存/CPU 统计用 Win32 API
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_Storage_FileSystem",
+] }

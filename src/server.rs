@@ -109,33 +109,12 @@ impl Drop for GateGuard {
     }
 }
 
-fn read_vmrss_kb() -> Option<u64> {
-    let status = fs::read_to_string("/proc/self/status").ok()?;
-    for line in status.lines() {
-        if let Some(rest) = line.strip_prefix("VmRSS:") {
-            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
-            return Some(kb);
-        }
-    }
-    None
-}
-
-fn read_cpu_ticks() -> u64 {
-    if let Ok(s) = fs::read_to_string("/proc/self/stat") {
-        let p: Vec<&str> = s.split_whitespace().collect();
-        if p.len() > 14 {
-            let utime: u64 = p[13].parse().unwrap_or(0);
-            let stime: u64 = p[14].parse().unwrap_or(0);
-            return utime + stime;
-        }
-    }
-    0
-}
+// 内存 / CPU 统计改为走 platform 模块（Unix 读 /proc，Windows 走 Win32 API）
 
 async fn memory_monitor(gate: Arc<Gate>, base: usize) {
     let mut reduced = false;
     loop {
-        if let Some(kb) = read_vmrss_kb() {
+        if let Some(kb) = crate::platform::read_vmrss_kb() {
             if kb > ONE_GIB_KB {
                 reduced = true;
             } else if kb < HALF_GIB_KB {
@@ -149,9 +128,24 @@ async fn memory_monitor(gate: Arc<Gate>, base: usize) {
 }
 
 async fn session_cleanup(db: Arc<Db>) {
+    // 会话过期检查：每分钟一次（原行为，保持不变）
+    let mut last_prune = Instant::now();
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
         db.delete_expired_sessions();
+
+        // 请求日志清理：每天一次。
+        // request_logs 原来只增不减，公网跑久了数据库和 WAL 会无限增长。
+        // 保留策略见 Db::prune_request_logs 的注释（正常 30 天 / 安全类别 90 天）。
+        if last_prune.elapsed() >= Duration::from_secs(24 * 60 * 60) {
+            let n = db.prune_request_logs();
+            if n > 0 {
+                eprintln!("request_logs pruned: {n} rows removed");
+            }
+            // 清理后把 WAL 合并回主库，让主库文件反映真实数据量
+            db.checkpoint_wal();
+            last_prune = Instant::now();
+        }
     }
 }
 
@@ -296,14 +290,7 @@ fn authorized(state: &AppState, headers: &HeaderMap) -> bool {
 }
 
 fn random_token() -> String {
-    use std::io::Read;
-    if let Ok(mut f) = fs::File::open("/dev/urandom") {
-        let mut buf = [0u8; 16];
-        if f.read_exact(&mut buf).is_ok() {
-            return buf.iter().map(|b| format!("{:02x}", b)).collect();
-        }
-    }
-    format!("{:x}", Instant::now().elapsed().as_nanos())
+    crate::platform::random_token()
 }
 
 fn parse_cookies(headers: &HeaderMap) -> HashMap<String, String> {
@@ -497,11 +484,19 @@ async fn handle_admin_api(state: &Arc<AppState>, path: &str, req: Request) -> Re
             }),
         )
     } else if path == "/api/admin/system" {
-        let rss = read_vmrss_kb().unwrap_or(0);
-        let t0 = read_cpu_ticks();
+        let rss = crate::platform::read_vmrss_kb().unwrap_or(0);
+        let t0 = crate::platform::read_cpu_ticks();
         tokio::time::sleep(Duration::from_millis(300)).await;
-        let t1 = read_cpu_ticks();
-        let cpu = if t1 >= t0 { ((t1 - t0) as f64 / 100.0) / (0.3 * 4.0) * 100.0 } else { 0.0 };
+        let t1 = crate::platform::read_cpu_ticks();
+        // 原实现按 4 核归一化；这里换成实际逻辑核数，跨平台与跨机型都更准。
+        let ncpu = std::thread::available_parallelism()
+            .map(|n| n.get() as f64)
+            .unwrap_or(4.0);
+        let cpu = if t1 >= t0 {
+            ((t1 - t0) as f64 / 100.0) / (0.3 * ncpu) * 100.0
+        } else {
+            0.0
+        };
         let db_size = state.db.db_size();
         let uptime = state.start.elapsed().as_secs();
         let (gate_active, gate_limit) = state.gate.snapshot();

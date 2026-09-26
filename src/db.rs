@@ -22,6 +22,17 @@ pub struct Post {
     pub updated_at: String,
 }
 
+/// `import_post` 的结果。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportOutcome {
+    /// 新建了一篇
+    Created,
+    /// 覆盖了同 slug 的已有文章
+    Updated,
+    /// 已存在且未指定 force，跳过
+    Skipped,
+}
+
 #[derive(Clone)]
 pub struct LogRow {
     pub id: i64,
@@ -323,6 +334,71 @@ impl Db {
 
     // ---- posts ----
 
+    /// 导入一篇带指定 slug 的文章（供 `import_posts` 工具使用）。
+    ///
+    /// 与 `create_post` 的区别：slug 由调用方给定，不再从标题推导。
+    /// 原因：`slugify` 不处理中文，而原始 frontmatter 里声明了英文 slug，
+    /// 必须原样保留，否则已有文章链接会全部失效。
+    ///
+    /// `force=false` 时若同 slug 已存在则跳过。
+    pub fn import_post(
+        &self,
+        slug: &str,
+        title: &str,
+        content_md: &str,
+        categories: Vec<String>,
+        tags: Vec<String>,
+        desc: &str,
+        date: &str,
+        force: bool,
+    ) -> Result<ImportOutcome, String> {
+        let content_html = render_markdown(content_md);
+        let desc = if desc.trim().is_empty() {
+            content_md
+                .trim()
+                .lines()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("")
+                .chars()
+                .take(80)
+                .collect()
+        } else {
+            desc.to_string()
+        };
+        let cats = serde_json::to_string(&categories).unwrap_or_else(|_| "[]".to_string());
+        let tagstr = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
+        let date = if date.trim().is_empty() {
+            String::new()
+        } else {
+            date.to_string()
+        };
+
+        let conn = self.conn.lock().unwrap();
+        let existing: Option<i64> = conn
+            .query_row("SELECT id FROM posts WHERE slug=?1", params![slug], |r| r.get(0))
+            .ok();
+
+        match existing {
+            Some(id) if !force => Ok(ImportOutcome::Skipped),
+            Some(id) => {
+                conn.execute(
+                    "UPDATE posts SET title=?1,content_md=?2,content_html=?3,categories=?4,tags=?5,desc=?6,date=?7,updated_at=datetime('now') WHERE id=?8",
+                    params![title, content_md, content_html, cats, tagstr, desc, date, id],
+                )
+                .map_err(|e| e.to_string())?;
+                Ok(ImportOutcome::Updated)
+            }
+            None => {
+                conn.execute(
+                    "INSERT INTO posts(slug,title,content_md,content_html,categories,tags,desc,date,updated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,datetime('now'))",
+                    params![slug, title, content_md, content_html, cats, tagstr, desc, date],
+                )
+                .map_err(|e| e.to_string())?;
+                Ok(ImportOutcome::Created)
+            }
+        }
+    }
+
     pub fn list_posts(&self) -> Vec<Post> {
         let conn = self.conn.lock().unwrap();
         let mut out = Vec::new();
@@ -458,6 +534,71 @@ impl Db {
         let conn = self.conn.lock().unwrap();
         conn.query_row("SELECT COUNT(*) FROM sessions WHERE expires_at>strftime('%s','now')", [], |r| r.get(0))
             .unwrap_or(0)
+    }
+
+    /// 清理过期的请求日志。
+    ///
+    /// 为什么需要：`request_logs` 原来只增不减。迁移到本机时已有 2 万多条，
+    /// 公网每天又新增几百到几千条，数据库和 WAL 会无限增长，
+    /// 管理后台的 `/api/admin/system` 里「DB」那个数字也会一直涨。
+    ///
+    /// 保留策略（区分对待，因为安全审计价值和流量噪声不是一个量级）：
+    ///   · 正常访问 (normal)            —— 保留 30 天
+    ///   · 安全类别 (scan/crawler/
+    ///     blocked/bruteforce)          —— 保留 90 天，攻击痕迹值得多留
+    ///
+    /// 返回删掉的行数。失败时静默返回 0（日志清理失败不该影响服务）。
+    ///
+    /// 用 `datetime('now')` 与写入侧的 `datetime('now')` 保持一致，
+    /// 两边都是 UTC 字符串，可以直接做字符串比较。
+    pub fn prune_request_logs(&self) -> usize {
+        const NORMAL_RETAIN_DAYS: i64 = 30;
+        const SECURITY_RETAIN_DAYS: i64 = 90;
+
+        let conn = self.conn.lock().unwrap();
+
+        // 正常流量：只留最近 30 天
+        let normal = conn
+            .execute(
+                "DELETE FROM request_logs \
+                 WHERE category = 'normal' \
+                   AND timestamp < datetime('now', ?1)",
+                params![format!("-{NORMAL_RETAIN_DAYS} days")],
+            )
+            .unwrap_or(0);
+
+        // 安全类别的老记录：留 90 天
+        let security = conn
+            .execute(
+                "DELETE FROM request_logs \
+                 WHERE category IN ('scan','crawler','blocked','bruteforce') \
+                   AND timestamp < datetime('now', ?1)",
+                params![format!("-{SECURITY_RETAIN_DAYS} days")],
+            )
+            .unwrap_or(0);
+
+        // 兜底：万一有未知 category 绕过了上面两条，按最长期限再清一次
+        let other = conn
+            .execute(
+                "DELETE FROM request_logs \
+                 WHERE category NOT IN ('normal','scan','crawler','blocked','bruteforce') \
+                   AND timestamp < datetime('now', ?1)",
+                params![format!("-{SECURITY_RETAIN_DAYS} days")],
+            )
+            .unwrap_or(0);
+
+        normal + security + other
+    }
+
+    /// 把 WAL 合并回主库文件。
+    ///
+    /// SQLite 默认 `wal_autocheckpoint` 是 1000 页（约 4 MB），
+    /// 请求日志写入频繁时 WAL 会长期停在触发线附近，
+    /// 出现「WAL 比主库还大」的情况（实测 4.0 MB vs 2.4 MB）。
+    /// 定期 checkpoint 能让主库文件反映真实数据量，WAL 也能回落。
+    pub fn checkpoint_wal(&self) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
 
