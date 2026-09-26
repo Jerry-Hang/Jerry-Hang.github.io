@@ -38,15 +38,30 @@ const state = {
   outline: [],
   articleIdx: -1,
   pinnedPage: 1,
-  fontScale: Number(localStorage.getItem("jb_font") || 0)
+  // 默认字号档位见下面 FONT_SIZES 的注释。localStorage 里没有记录时用中间那档。
+  fontScale: (function () {
+    const v = localStorage.getItem("jb_font");
+    const n = v === null ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 4 ? n : 2;
+  })()
 };
 
-const FONT_SIZES = [13.5, 15, 16.5, 18];
+/* 正文字号档位。
+   默认取中间那档（16.5px）—— 中文正文 16-17px 最舒服。
+   之前默认是档位 0 也就是 13.5px，偏小，长文读起来累。
+
+   注意：applyFontScale 往 #r-body 写的是内联样式，优先级高于 CSS 里的
+   .md-body 规则，所以正文实际字号由这里的 FONT_SIZES 决定，改 CSS 没用。 */
+const FONT_SIZES = [14, 15.5, 16.5, 18, 19.5];
+const FONT_DEFAULT = 2;
 function applyFontScale() {
   const el = document.getElementById("r-body");
   if (el) el.style.fontSize = FONT_SIZES[state.fontScale] + "px";
   const cur = document.getElementById("r-font-cur");
-  if (cur) cur.textContent = "A" + (state.fontScale > 0 ? "+".repeat(state.fontScale) : "");
+  if (cur) {
+    const steps = state.fontScale - FONT_DEFAULT;
+    cur.textContent = "A" + (steps > 0 ? "+".repeat(steps) : (steps < 0 ? "−".repeat(-steps) : ""));
+  }
   localStorage.setItem("jb_font", String(state.fontScale));
 }
 
@@ -88,7 +103,7 @@ function mdInline(src) {
 function mdToHtml(md) {
   const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
   const FENCE = String.fromCharCode(96).repeat(3);
-  let out = "", i = 0, inCode = false, codeBuf = [], listType = null;
+  let out = "", i = 0, inCode = false, codeBuf = [], listType = null, codeLang = "";
 
   const closeList = () => { if (listType) { out += "</" + listType + ">"; listType = null; } };
   const openList = t => { if (listType === t) return; closeList(); out += "<" + t + ">"; listType = t; };
@@ -97,8 +112,17 @@ function mdToHtml(md) {
     const line = lines[i];
 
     if (line.trim().startsWith(FENCE)) {
-      if (!inCode) { inCode = true; codeBuf = []; }
-      else { out += "<pre><code>" + codeBuf.map(esc).join("\n") + "</code></pre>"; inCode = false; }
+      if (!inCode) {
+        inCode = true; codeBuf = [];
+        // 取出围栏后的语言标识（```js / ```rust），给 <pre> 打 data-lang
+        const info = line.trim().slice(FENCE.length).trim().split(/\s+/)[0] || "";
+        codeLang = info.replace(/[^\w+#-]/g, "");
+      } else {
+        const attr = codeLang ? ' data-lang="' + esc(codeLang) + '"' : "";
+        const cls = codeLang ? ' class="language-' + esc(codeLang) + '"' : "";
+        out += "<pre" + attr + "><code" + cls + ">" + codeBuf.map(esc).join("\n") + "</code></pre>";
+        inCode = false; codeLang = "";
+      }
       i++; continue;
     }
     if (inCode) { codeBuf.push(line); i++; continue; }
@@ -524,7 +548,279 @@ function openArticle(idx) {
       relBox.innerHTML = "";
     }
   }
+  enhanceArticle(mdBody, outline);
 }
+
+/* ==========================================================================
+   阅读增强
+   --------------------------------------------------------------------------
+   全部在渲染完成后对 DOM 做后处理，不改 mdToHtml 的输出结构。
+   这样插件的、复制的、存档的旧 HTML 都不会受影响。
+   ========================================================================== */
+
+/* ---------- 极轻量语法高亮 ----------
+   不引第三方库（站点是零依赖的单文件静态站）。
+   策略：先把已转义的 HTML 文本按 token 切分，再逐段包 span，
+   绝不回填未转义内容，避免破坏 XSS 防护。
+   覆盖常见语言的关键字集，识别不了的按纯文本处理。 */
+
+const HL_KEYWORDS = {
+  js: "const let var function return if else for while do switch case break continue new typeof instanceof class extends super this null undefined true false try catch finally throw async await yield import export from default of in delete void static get set",
+  ts: "const let var function return if else for while do switch case break continue new typeof instanceof class extends super this null undefined true false try catch finally throw async await yield import export from default of in delete void static get set interface type enum implements readonly public private protected",
+  rust: "fn let mut const static struct enum impl trait pub use mod crate self super match if else for while loop return break continue where as dyn ref move async await unsafe extern box in true false Some None Ok Err String Vec Option Result",
+  py: "def class return if elif else for while import from as try except finally raise with lambda None True False and or not in is pass break continue global nonlocal yield assert del async await self",
+  sh: "if then else elif fi for while do done case esac function return export local readonly source alias echo cd ls cp mv rm mkdir cat grep sed awk curl wget sudo apt npm pnpm node git",
+  sql: "SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE DROP ALTER INDEX JOIN LEFT RIGHT INNER OUTER ON GROUP BY ORDER HAVING LIMIT OFFSET AND OR NOT NULL PRIMARY KEY FOREIGN REFERENCES DEFAULT",
+  css: "important media supports keyframes import charset",
+  json: "true false null",
+  yaml: "true false null",
+  toml: "true false",
+  html: "",
+  md: "",
+  text: ""
+};
+
+function langKey(lang) {
+  const l = String(lang || "").toLowerCase();
+  if (!l) return "";
+  if (l === "javascript" || l === "jsx" || l === "mjs" || l === "cjs") return "js";
+  if (l === "typescript" || l === "tsx") return "ts";
+  if (l === "rs") return "rust";
+  if (l === "python" || l === "python3") return "py";
+  if (l === "bash" || l === "shell" || l === "zsh" || l === "console" || l === "powershell" || l === "ps1") return "sh";
+  if (l === "postgres" || l === "sqlite" || l === "mysql") return "sql";
+  if (l === "yml") return "yaml";
+  if (l === "htm") return "html";
+  if (l === "markdown") return "md";
+  if (l === "plain" || l === "plaintext" || l === "txt") return "text";
+  return HL_KEYWORDS[l] !== undefined ? l : "";
+}
+
+/**
+ * 对已转义的源码做高亮。
+ * 输入必须是 escape 之后的文本；输出是可安全插入 innerHTML 的字符串。
+ */
+function highlight(escaped, lang) {
+  const key = langKey(lang);
+  if (!key || key === "html" || key === "md" || key === "text") return null;
+  const kws = HL_KEYWORDS[key];
+  if (!kws) return null;
+  const kwSet = new Set(kws.split(/\s+/).filter(Boolean));
+
+  // 一个总正则，按优先级匹配：注释 / 字符串 / 数字 / 标识符
+  // 注意 \\x60 是反引号，避免和模板字符串的界定符冲突
+  const BT = String.fromCharCode(96);
+  const re = new RegExp(
+    "(\\/\\/[^\\n]*|#[^\\n]*|--[^\\n]*)" +          // 1 行注释
+    "|(\\/\\*[\\s\\S]*?\\*\\/)" +                    // 2 块注释
+    "|(\"(?:[^\"\\\\\\n]|\\\\.)*\")" +               // 3 双引号串
+    "|('(?:[^'\\\\\\n]|\\\\.)*')" +                  // 4 单引号串
+    "|(" + BT + "[^" + BT + "]*" + BT + ")" +        // 5 反引号串
+    "|(\\b\\d[\\d_.]*\\b)" +                         // 6 数字
+    "|([A-Za-z_$][\\w$]*)" +                         // 7 标识符
+    "|([{}()\\[\\];,.:=+\\-*/%<>!&|?~^]+)",          // 8 符号
+    "g"
+  );
+
+  let out = "";
+  let last = 0;
+  let m;
+  while ((m = re.exec(escaped)) !== null) {
+    if (m.index > last) out += escaped.slice(last, m.index);
+    if (m[1] || m[2]) {
+      out += '<span class="tok-comment">' + m[0] + "</span>";
+    } else if (m[3] || m[4] || m[5]) {
+      out += '<span class="tok-string">' + m[0] + "</span>";
+    } else if (m[6]) {
+      out += '<span class="tok-number">' + m[0] + "</span>";
+    } else if (m[7]) {
+      const w = m[0];
+      if (kwSet.has(w)) {
+        out += '<span class="tok-keyword">' + w + "</span>";
+      } else {
+        // 后面紧跟 ( 的当成函数名
+        const after = escaped.slice(re.lastIndex, re.lastIndex + 1);
+        out += after === "("
+          ? '<span class="tok-func">' + w + "</span>"
+          : (/^[A-Z]/.test(w) ? '<span class="tok-type">' + w + "</span>" : w);
+      }
+    } else if (m[8]) {
+      out += '<span class="tok-punct">' + m[0] + "</span>";
+    } else {
+      out += m[0];
+    }
+    last = re.lastIndex;
+  }
+  out += escaped.slice(last);
+  return out;
+}
+
+/** 渲染完成后对文章正文做增强 */
+function enhanceArticle(mdBody, outline) {
+  if (!mdBody) return;
+
+  /* ---- 1. 代码块：语言标签 + 高亮 + 复制按钮 ---- */
+  mdBody.querySelectorAll("pre").forEach(pre => {
+    let codeEl = pre.querySelector("code");
+    if (!codeEl) return;
+
+    // 语言从 class="language-xxx" 读（mdToHtml 目前不加，但存档页可能有）
+    let lang = "";
+    const cls = codeEl.className || "";
+    const mm = /language-([\w+-]+)/.exec(cls);
+    if (mm) lang = mm[1];
+    if (!lang) {
+      // 兼容之前生成的页面：有的把语言写在 pre 的 data-lang 上
+      lang = pre.getAttribute("data-lang") || "";
+    }
+    if (lang) pre.setAttribute("data-lang", lang);
+
+    const plain = codeEl.textContent;
+    const highlighted = highlight(esc(plain), lang);
+    if (highlighted !== null) codeEl.innerHTML = highlighted;
+
+    if (!pre.querySelector(".code-copy")) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "code-copy";
+      b.textContent = "复制";
+      pre.appendChild(b);
+    }
+  });
+
+  /* ---- 2. 标题锚点（hover 出现 §，点击复制该节链接） ---- */
+  mdBody.querySelectorAll("h2,h3").forEach(h => {
+    if (!h.id) return;
+    if (h.querySelector(".h-anchor")) return;
+    const a = document.createElement("a");
+    a.className = "h-anchor";
+    a.href = "#" + h.id;
+    a.textContent = "§";
+    a.setAttribute("aria-label", "本节链接");
+    h.insertBefore(a, h.firstChild);
+  });
+
+  /* ---- 3. 目录 ---- */
+  renderToc(mdBody, outline);
+
+  /* ---- 4. 图片灯箱 ---- */
+  bindLightbox(mdBody);
+}
+
+/** 生成目录并绑定滚动高亮 */
+let tocObserver = null;
+function renderToc(mdBody, outline) {
+  const box = document.getElementById("r-toc");
+  if (!box) return;
+
+  if (tocObserver) { tocObserver.disconnect(); tocObserver = null; }
+
+  const items = (outline || []).filter(x => x.text);
+  // 少于 3 个标题就不显示目录，否则显得多余
+  if (items.length < 3) { box.hidden = true; box.innerHTML = ""; return; }
+
+  box.hidden = false;
+  box.innerHTML =
+    '<div class="toc-head">本文目录</div><ol>' +
+    items.map(x =>
+      '<li><a href="#' + esc(x.id) + '" class="lv-' + x.level + '" data-target="' + esc(x.id) + '">' +
+        esc(x.text) + '</a></li>'
+    ).join("") +
+    '</ol>';
+
+  // 平滑滚动（顶栏高度留白由 CSS 的 scroll-margin-top 处理）
+  box.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", e => {
+      e.preventDefault();
+      const el = document.getElementById(a.dataset.target);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", "#" + a.dataset.target);
+      setActiveToc(a.dataset.target);
+    });
+  });
+
+  // 滚动高亮：用 IntersectionObserver 比监听 scroll 省性能
+  const links = {};
+  box.querySelectorAll("a").forEach(a => { links[a.dataset.target] = a; });
+
+  if ("IntersectionObserver" in window) {
+    tocObserver = new IntersectionObserver(entries => {
+      // 取当前可见的最靠上的标题
+      const vis = entries.filter(e => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (vis.length) setActiveToc(vis[0].target.id);
+    }, { rootMargin: "-80px 0px -70% 0px", threshold: 0 });
+    items.forEach(x => {
+      const el = document.getElementById(x.id);
+      if (el) tocObserver.observe(el);
+    });
+  }
+
+  function setActiveToc(id) {
+    box.querySelectorAll("a").forEach(a => a.classList.toggle("active", a.dataset.target === id));
+  }
+  window.__setActiveToc = setActiveToc;
+}
+
+/** 图片点击放大 */
+function bindLightbox(mdBody) {
+  const lb = document.getElementById("lightbox");
+  if (!lb) return;
+  const img = lb.querySelector("img");
+
+  mdBody.querySelectorAll("img").forEach(im => {
+    if (im.dataset.lbBound) return;
+    im.dataset.lbBound = "1";
+    im.addEventListener("click", () => {
+      img.src = im.currentSrc || im.src;
+      img.alt = im.alt || "";
+      lb.classList.add("on");
+      document.body.style.overflow = "hidden";
+    });
+  });
+}
+function closeLightbox() {
+  const lb = document.getElementById("lightbox");
+  if (lb) lb.classList.remove("on");
+  document.body.style.overflow = "";
+}
+
+/* ---------- 进度条 + 回到顶部 ---------- */
+function initReadingChrome() {
+  const bar = document.getElementById("read-progress");
+  const top = document.getElementById("to-top");
+  if (!bar && !top) return;
+
+  function onScroll() {
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - doc.clientHeight;
+    const y = window.scrollY || doc.scrollTop || 0;
+    const pct = max > 8 ? Math.min(100, Math.max(0, (y / max) * 100)) : 0;
+
+    if (bar) {
+      // 只在阅读视图显示进度条
+      const reading = state.nav === "reader";
+      bar.style.width = pct + "%";
+      bar.classList.toggle("on", reading && pct > 0.5);
+    }
+    if (top) top.classList.toggle("on", y > 400);
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  if (top) top.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  window.__refreshReadingChrome = onScroll;
+  onScroll();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const lb = document.getElementById("lightbox");
+  if (lb) {
+    lb.addEventListener("click", e => { if (e.target === lb) closeLightbox(); });
+  }
+  initReadingChrome();
+});
 
 /* ---------- 归档 ---------- */
 function renderArchive() {
@@ -669,7 +965,13 @@ document.getElementById("r-body").addEventListener("click", e => {
   }
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") { toggleSidebar(false); return; }
+  if (e.key === "Escape") {
+    // 图片灯箱优先关闭，再关侧栏
+    const lb = document.getElementById("lightbox");
+    if (lb && lb.classList.contains("on")) { closeLightbox(); return; }
+    toggleSidebar(false);
+    return;
+  }
   if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
     const tag2 = (e.target && e.target.tagName) || "";
     if (tag2 !== "INPUT" && tag2 !== "TEXTAREA") { e.preventDefault(); document.getElementById("side-search").focus(); return; }
