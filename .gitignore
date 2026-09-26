@@ -21,3 +21,8 @@
 *.swp
 .DS_Store
 /frontend/target/
+
+# 界面预览截图（本地调试用）
+/_预览/
+/_shot.mjs
+

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>登录 · JerryHang 博客后台</title>
+<style>
+/* 公共样式由服务端在编译期内联进来，见 server.rs 的 login_page()。
+   不能引用 /_admin/admin.css —— 那个路径需要已登录才能访问，
+   未登录请求会被 302 回登录页，浏览器拿到的是 HTML 而不是 CSS。 */
+/*__CSS__*/
+</style>
+<style>
+/* 登录页专用布局 */
+body.login {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+/* 背景柔和色晕（跟随系统主题） */
+body.login::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(700px 480px at 18% 8%,  var(--blue-soft), transparent 62%),
+    radial-gradient(620px 440px at 84% 92%, var(--purple) , transparent 64%);
+  opacity: .55;
+}
+
+.login-card {
+  position: relative; z-index: 1;
+  width: min(380px, 100%);
+  background: var(--bg-elevated);
+  border-radius: 22px;
+  box-shadow: var(--shadow-m);
+  padding: 34px 30px 30px;
+}
+
+.login-card .brand {
+  width: 54px; height: 54px;
+  border-radius: 15px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 26px; font-weight: 700;
+  display: grid; place-items: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 6px 18px var(--blue-soft);
+}
+
+.login-card h1 {
+  font-size: 21px; font-weight: 600;
+  text-align: center; margin: 0 0 5px;
+  letter-spacing: -.02em;
+}
+.login-card .hint {
+  font-size: 13.5px; color: var(--fg-2);
+  text-align: center; margin: 0 0 24px;
+}
+
+.login-card .field { margin-bottom: 14px; }
+.login-card .input { padding: 12px 14px; font-size: 15px; }
+
+.login-card .btn.primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px; font-weight: 600;
+  border-radius: 11px;
+  margin-top: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+.err {
+  font-size: 13px;
+  color: var(--red);
+  background: var(--red-soft);
+  border-radius: 9px;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  display: none;
+}
+.err.show { display: block; animation: shake .3s; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-4px); }
+  75%     { transform: translateX(4px); }
+}
+
+/* 加载中的小转圈 */
+.spin {
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rot .7s linear infinite;
+  display: none;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+.btn.loading .spin { display: block; }
+.btn.loading .label { opacity: .75; }
+
+.login-foot {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 12.5px; color: var(--fg-3);
+}
+.login-foot a { color: var(--fg-2); text-decoration: none; }
+.login-foot a:hover { color: var(--blue); }
+</style>
+</head>
+<body class="login">
+
+<form class="login-card" id="f" autocomplete="on">
+  <div class="brand">J</div>
+  <h1>博客后台</h1>
+  <p class="hint">请登录以继续</p>
+
+  <div class="err" id="err"></div>
+
+  <div class="field">
+    <label for="u">用户名</label>
+    <input class="input" id="u" name="username" type="text"
+           autocomplete="username" autocapitalize="off"
+           autocorrect="off" spellcheck="false" required autofocus>
+  </div>
+
+  <div class="field">
+    <label for="p">密码</label>
+    <input class="input" id="p" name="password" type="password"
+           autocomplete="current-password" required>
+  </div>
+
+  <button class="btn primary" id="go" type="submit">
+    <span class="spin"></span><span class="label">登录</span>
+  </button>
+
+  <p class="login-foot">
+    <a href="/">← 返回博客前台</a>
+  </p>
+</form>
+
+<script>
+(function () {
+  var f = document.getElementById('f');
+  var u = document.getElementById('u');
+  var p = document.getElementById('p');
+  var go = document.getElementById('go');
+  var err = document.getElementById('err');
+
+  function showErr(msg) {
+    err.textContent = msg;
+    err.classList.add('show');
+  }
+
+  f.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    err.classList.remove('show');
+
+    if (!u.value || !p.value) {
+      showErr('请填写用户名和密码');
+      return;
+    }
+
+    go.classList.add('loading');
+    go.disabled = true;
+
+    try {
+      var r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u.value, password: p.value })
+      });
+      var d = {};
+      try { d = await r.json(); } catch (_) {}
+
+      if (r.ok && d.ok) {
+        // 会话 cookie 已由服务端下发，直接进后台
+        location.replace('/');
+        return;
+      }
+      showErr(d.error || (r.status === 401 ? '用户名或密码不正确' : '登录失败（HTTP ' + r.status + '）'));
+    } catch (_) {
+      showErr('无法连接服务，请确认博客服务正在运行');
+    }
+
+    go.classList.remove('loading');
+    go.disabled = false;
+    p.value = '';
+    p.focus();
+  });
+})();
+</script>
+</body>
+</html>

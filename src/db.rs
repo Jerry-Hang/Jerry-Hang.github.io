@@ -530,6 +530,17 @@ impl Db {
         let _ = conn.execute("DELETE FROM sessions WHERE expires_at<=strftime('%s','now')", []);
     }
 
+    /// 立即作废一个会话（退出登录用）。
+    ///
+    /// 之前只有「等它自然过期」这一条路，退出登录实际上只是让浏览器
+    /// 丢掉 cookie，服务端那条会话仍然是有效状态、还能被重放。
+    pub fn delete_session(&self, token: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM sessions WHERE token=?1", params![token])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn active_sessions_count(&self) -> i64 {
         let conn = self.conn.lock().unwrap();
         conn.query_row("SELECT COUNT(*) FROM sessions WHERE expires_at>strftime('%s','now')", [], |r| r.get(0))

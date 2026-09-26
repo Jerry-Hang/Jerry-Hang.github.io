@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>博客后台 · JerryHang</title>
+<link rel="stylesheet" href="/_admin/admin.css">
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo">J</div>
+  <div class="titles">
+    <h1>博客后台</h1>
+    <p class="sub" id="host">本地管理控制台</p>
+  </div>
+  <div class="actions">
+    <div class="segmented" id="tabs">
+      <button data-view="dash" class="active">概览</button>
+      <button data-view="posts">文章</button>
+      <button data-view="security">安全</button>
+      <button data-view="logs">日志</button>
+    </div>
+    <a class="btn" href="/" target="_blank" rel="noopener">前台 ↗</a>
+    <button class="btn" id="logout">退出</button>
+  </div>
+</header>
+
+<div class="page">
+
+  <div class="notice" id="msg"></div>
+
+  <!-- ================================================== 概览 -->
+  <section class="view" id="view-dash">
+
+    <div class="card">
+      <h2>今日概况</h2>
+      <div class="kpis">
+        <div class="kpi">
+          <span class="v blue" id="k-today"><span class="skeleton">000</span></span>
+          <span class="l">今日请求</span>
+        </div>
+        <div class="kpi">
+          <span class="v" id="k-posts"><span class="skeleton">00</span></span>
+          <span class="l">已发布文章</span>
+        </div>
+        <div class="kpi">
+          <span class="v green" id="k-up"><span class="skeleton">000</span></span>
+          <span class="l">已运行</span>
+        </div>
+        <div class="kpi">
+          <span class="v" id="k-rss"><span class="skeleton">000</span></span>
+          <span class="l">内存占用</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>请求趋势</h2>
+      <div class="chart-wrap">
+        <canvas class="chart" id="c-hourly" height="180"></canvas>
+      </div>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>请求分类</h2>
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <div class="card">
+        <h2>运行状态</h2>
+        <div class="kpis cols-2">
+          <div class="kpi">
+            <span class="v" id="k-cpu"><span class="skeleton">00</span></span>
+            <span class="l">CPU</span>
+          </div>
+          <div class="kpi">
+            <span class="v" id="k-db"><span class="skeleton">000</span></span>
+            <span class="l">数据库</span>
+          </div>
+          <div class="kpi">
+            <span class="v" id="k-gate"><span class="skeleton">000</span></span>
+            <span class="l">并发连接</span>
+          </div>
+          <div class="kpi">
+            <span class="v" id="k-sess"><span class="skeleton">00</span></span>
+            <span class="l">活跃会话</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>按天分布</h2>
+      <div class="chart-wrap">
+        <canvas class="chart" id="c-daily" height="180"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== 文章 -->
+  <section class="view" id="view-posts" hidden>
+    <div class="grid cols-2">
+
+      <div class="card">
+        <h2 id="editor-title">写新文章</h2>
+        <div class="pad">
+          <input type="hidden" id="p-id">
+          <div class="field">
+            <label for="p-title">标题</label>
+            <input class="input" id="p-title" placeholder="文章标题">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="p-cats">分类（逗号分隔）</label>
+              <input class="input" id="p-cats" placeholder="随笔, 技术">
+            </div>
+            <div class="field">
+              <label for="p-tags">标签（逗号分隔）</label>
+              <input class="input" id="p-tags" placeholder="Windows, 折腾">
+            </div>
+          </div>
+          <div class="field">
+            <label for="p-body">正文（支持 Markdown）</label>
+            <textarea class="textarea" id="p-body" placeholder="# 标题&#10;&#10;正文内容……"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" id="p-save">保存</button>
+            <button class="btn" id="p-clear">清空表单</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>全部文章 <span id="post-count" style="color:var(--fg-3);font-weight:400"></span></h2>
+        <ul class="list" id="post-list">
+          <li><div class="empty">加载中…</div></li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================== 安全 -->
+  <section class="view" id="view-security" hidden>
+    <div class="card">
+      <h2>威胁监控</h2>
+      <div class="kpis">
+        <button class="kpi clickable" data-detail="scan">
+          <span class="v orange" id="k-scan"><span class="skeleton">000</span></span>
+          <span class="l">扫描（404）</span>
+        </button>
+        <button class="kpi clickable" data-detail="crawler">
+          <span class="v blue" id="k-crawler"><span class="skeleton">000</span></span>
+          <span class="l">爬虫</span>
+        </button>
+        <button class="kpi clickable" data-detail="blocked">
+          <span class="v red" id="k-blocked"><span class="skeleton">000</span></span>
+          <span class="l">并发拦截</span>
+        </button>
+        <button class="kpi clickable" data-detail="bruteforce">
+          <span class="v red" id="k-brute"><span class="skeleton">000</span></span>
+          <span class="l">认证爆破</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>恶意流量峰值时段</h2>
+      <div class="bars" id="bars-sec"></div>
+    </div>
+
+    <div class="card">
+      <h2>说明</h2>
+      <div class="pad" style="color:var(--fg-2);font-size:13.5px;line-height:1.75">
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">扫描</b>　访问不存在的路径（404），通常是自动化工具在探测漏洞。</p>
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">爬虫</b>　User-Agent 含 bot / crawler / spider / scanner 的请求。</p>
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">并发拦截</b>　超过并发门控上限、被返回 503 的连接。</p>
+        <p style="margin:0"><b style="color:var(--fg)">认证爆破</b>　管理接口认证失败（401）的记录。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== 日志 -->
+  <section class="view" id="view-logs" hidden>
+    <div class="card">
+      <h2>访问日志</h2>
+      <div class="pad-t">
+        <div class="row" style="align-items:flex-end">
+          <div class="field" style="margin-bottom:0">
+            <label for="f-cat">按类别筛选</label>
+            <input class="input" id="f-cat" placeholder="normal / scan / crawler / blocked / bruteforce">
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label for="f-ip">按 IP 筛选</label>
+            <input class="input" id="f-ip" placeholder="例如 192.168.1.1">
+          </div>
+          <div style="flex:0 0 auto;display:flex;gap:8px;padding-bottom:1px">
+            <button class="btn primary" id="f-go">查询</button>
+            <button class="btn" id="f-reset">重置</button>
+          </div>
+        </div>
+        <p style="font-size:12.5px;color:var(--fg-3);margin:10px 0 0" id="log-summary"></p>
+      </div>
+      <div class="table-scroll" style="margin-top:10px">
+        <table class="data" id="log-table">
+          <thead>
+            <tr>
+              <th data-sort="timestamp">时间<span class="arrow"></span></th>
+              <th data-sort="ip">IP<span class="arrow"></span></th>
+              <th data-sort="method">方法<span class="arrow"></span></th>
+              <th data-sort="path">路径<span class="arrow"></span></th>
+              <th data-sort="status_code">状态<span class="arrow"></span></th>
+              <th data-sort="category">类别<span class="arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="log-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer class="foot">
+  JerryHang 博客后台 · 仅监听 127.0.0.1
+</footer>
+
+<!-- ================================================== 详情弹窗 -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="modal-title">详情</h2>
+      <button class="btn" id="modal-close">关闭</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script src="/_admin/admin.js"></script>
+</body>
+</html>
