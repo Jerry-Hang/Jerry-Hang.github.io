@@ -1928,6 +1928,251 @@ body.reading .md-body th { background: rgba(255,255,255,.05); }
 body.reading .md-body td,
 body.reading .md-body th { border-color: rgba(255,255,255,.1); }
 </style>
+<style id="geometry-normalize">
+/* ==========================================================================
+   几何规范统一
+   --------------------------------------------------------------------------
+   之前的问题是「到处都在用 999px」，而且尺寸没有统一尺度，量出来的结果：
+
+     #topbar          1369 x 36   圆角 999px  -> 38:1 的拉长胶囊，看着像根管子
+     .pager             26 x 26   圆角 999px  -> 没有分页时塌成一个小圆点
+     .hero-card        440 x 522  圆角 28px   -> 相对卡片尺寸过于圆
+     标签胶囊      高 21 / 24 / 25 三种
+     按钮          高 29 / 30 / 36 / 40 四种
+     字号              11 / 11.5 / 12 / 13 四档
+
+   这套规范把所有交互元素的尺寸收敛到三档，圆角只保留四级。
+   规则：只用 999px 表示「小尺寸的语义标签」或「正方形图标按钮」，
+   横长条和卡片一律用有限圆角，避免被拉成椭圆或管状。
+   ========================================================================== */
+
+:root {
+  /* 尺寸三档：小(标签) / 中(按钮) / 大(主操作) */
+  --ctl-sm: 26px;
+  --ctl-md: 32px;
+  --ctl-lg: 38px;
+  /* 圆角四级：给横长条和卡片用，不用 999 */
+  --r-xs: 6px;    /* 行内小标签 */
+  --r-sm: 8px;    /* 小控件、输入框 */
+  --r-md: 12px;   /* 按钮、列表项 */
+  --r-lg: 16px;   /* 卡片 */
+  --r-xl: 20px;   /* 大卡、面板 */
+  /* 字号三档 */
+  --fs-sm: 12px;
+  --fs-md: 13.5px;
+  --fs-lg: 15px;
+  /* 胶囊只用于这些语义标签，高度统一 */
+  --pill-h: var(--ctl-sm);
+}
+
+/* ---------- 顶栏：横长条用 16px 圆角，不做整条胶囊 ---------- */
+#topbar,
+.menubar, .taskbar, .top-bar, #taskbar, #menubar {
+  border-radius: var(--r-lg) !important;
+  padding: 0 clamp(10px, 1.4vw, 16px) !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  align-items: center !important;
+}
+#topbar > *, .menubar > *, .top-bar > *, #taskbar > *, #menubar > * { flex-shrink: 0; }
+
+/* 导航项：中档按钮，圆角 10px —— 和顶栏的 16px 形成层次但都有限 */
+#tb-tabs { gap: 2px !important; }
+#tb-tabs button {
+  height: var(--ctl-md) !important;
+  padding: 0 14px !important;
+  border-radius: var(--r-sm) !important;
+  font-size: var(--fs-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+
+/* 图标按钮：正圆，尺寸跟中档按钮对齐 */
+.icon-btn, .tb-menu {
+  width: var(--ctl-md) !important;
+  height: var(--ctl-md) !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+}
+
+/* 「查看后台」：中档按钮，圆角 8px（不是胶囊） */
+.tb-admin {
+  height: var(--ctl-md) !important;
+  padding: 0 14px !important;
+  border-radius: var(--r-sm) !important;
+  font-size: var(--fs-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+
+/* 品牌头像：正圆，尺寸跟按钮对齐 */
+#tb-brand { gap: 9px !important; }
+#tb-brand img {
+  width: var(--ctl-md) !important;
+  height: var(--ctl-md) !important;
+  border-radius: 50% !important;
+}
+#tb-brand b, #tb-brand .brand-text { font-size: var(--fs-lg) !important; }
+
+/* ---------- 语义标签：统一高度，圆角用胶囊但尺寸小，不会显畸形 ---------- */
+.hc-tag, .pc-tag,
+.home-grid .home-item .p-tag,
+.hi-cats, .hi-date {
+  height: var(--pill-h) !important;
+  padding: 0 10px !important;
+  border-radius: var(--r-xs) !important;   /* 6px：小标签用方角更利落 */
+  font-size: var(--fs-sm) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+  box-sizing: border-box;
+}
+
+/* ---------- 卡片圆角收敛 ---------- */
+.hero-card { border-radius: var(--r-xl) !important; }
+.side-card { border-radius: var(--r-lg) !important; }
+.home-grid .home-item { border-radius: var(--r-lg) !important; }
+body.reading .reader-head,
+body.reading .toc,
+body.reading .reader-foot,
+body.reading .r-related,
+body.reading #r-body { border-radius: var(--r-lg) !important; }
+.md-body pre { border-radius: var(--r-md) !important; }
+
+/* ---------- 分页条：不应该塌成小圆点 ---------- */
+.home-more .pager {
+  border-radius: var(--r-md) !important;
+  padding: 6px 8px !important;
+  min-height: 0 !important;
+  width: auto !important;
+  display: inline-flex !important;
+  gap: 6px !important;
+}
+/* 没有分页内容时整个隐藏，不留空壳 */
+.home-more .pager:empty { display: none !important; }
+.home-more .pager .pg-btn,
+.home-more .pager .pg-input {
+  height: var(--ctl-sm) !important;
+  border-radius: var(--r-xs) !important;
+  font-size: var(--fs-sm) !important;
+  padding: 0 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+  box-sizing: border-box;
+}
+.home-more .pager .pg-input { padding: 0 6px !important; width: 52px !important; }
+.home-more .pager .pg-info {
+  font-size: var(--fs-sm) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  height: var(--ctl-sm) !important;
+}
+
+/* ---------- 列表项与侧栏 ---------- */
+.sc-item { border-radius: 0 !important; }
+.pc-avatar { width: 80px !important; height: 80px !important; border-radius: 50% !important; }
+
+/* ---------- 回到顶部：正圆，跟图标按钮一致 ---------- */
+#to-top {
+  width: var(--ctl-lg) !important;
+  height: var(--ctl-lg) !important;
+  border-radius: 50% !important;
+}
+
+/* ---------- 阅读器里的字号按钮 ---------- */
+.r-fontbar {
+  border-radius: var(--r-md) !important;
+  padding: 4px 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+.r-fontbar button {
+  height: var(--ctl-sm) !important;
+  min-width: var(--ctl-sm) !important;
+  border-radius: var(--r-xs) !important;
+  font-size: var(--fs-sm) !important;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+
+/* ---------- 文章页底部导航按钮 ---------- */
+.pn-btn {
+  height: var(--ctl-md) !important;
+  border-radius: var(--r-sm) !important;
+  font-size: var(--fs-md) !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+
+/* ---------- 代码复制按钮 ---------- */
+.md-body pre .code-copy {
+  height: var(--ctl-sm) !important;
+  border-radius: var(--r-xs) !important;
+  font-size: var(--fs-sm) !important;
+  padding: 0 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+}
+
+/* ---------- 目录项 ---------- */
+.toc a { border-radius: var(--r-sm) !important; }
+
+/* ---------- 左侧目录栏：桌面常驻，手机仍是汉堡抽屉 ----------
+   原来那条 `#sidebar{flex-basis:0}` 是给手机设计的（点汉堡才展开到 40%），
+   但桌面上也生效，结果侧栏被压成 2px 的细缝，左边留一道残影，
+   导航被 margin-left:auto 推到中间、两边空荡 —— 这就是「很奇怪」的来源之一。
+   这里只在宽屏恢复常驻展开，窄屏行为完全不动。 */
+@media (min-width: 1000px) {
+  #sidebar {
+    flex: 0 0 300px !important;
+    /* 顶栏是浮动的（top:12px + 56px 高 + 12px 间距），侧栏要从它下面开始 */
+    position: sticky !important;
+    top: 80px !important;
+    height: calc(100vh - 104px) !important;
+    margin: 0 16px 20px 20px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border-radius: var(--r-lg) !important;
+    opacity: 1 !important;
+    transition: flex-basis .38s var(--ease) !important;
+  }
+  /* 手动收起后：退成细轨道，并露出握把 */
+  #layout:not(.side-open) #sidebar { flex: 0 0 34px !important; }
+  #layout.side-open #sidebar { flex: 0 0 300px !important; }
+  /* 握把恢复：细轨道状态下点它可以再展开 */
+  #side-grip { display: block !important; border-radius: var(--r-md) !important; }
+  #layout.side-open #side-grip { opacity: 0 !important; pointer-events: none !important; }
+  /* 侧栏展开时，导航自然靠左，不要再被推到中间 */
+  #tb-tabs { margin-left: 24px !important; margin-right: auto !important; }
+  /* 内容区跟着收窄一点，避免和 300px 侧栏抢空间 */
+  .view { max-width: 1080px !important; }
+}
+
+/* 宽屏默认展开一次：JS 在初始化时给 #layout 加 .side-open，
+   用户手动收起后不再自动展开（见 app.js 的 initSidebarDefault） */
+
+/* ---------- 窄屏：顶栏高度收一点 ---------- */
+@media (max-width: 720px) {
+  #topbar, .menubar, .taskbar, .top-bar, #taskbar, #menubar {
+    height: 52px !important; min-height: 52px !important; max-height: 52px !important;
+    border-radius: var(--r-md) !important;
+  }
+  #tb-tabs button { padding: 0 10px !important; font-size: var(--fs-sm) !important; }
+  .tb-admin { padding: 0 10px !important; font-size: var(--fs-sm) !important; }
+  :root { --ctl-md: 30px; --ctl-lg: 36px; }
+}
+</style>
 <script>
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
 </script><!--ADMIN_LINK_START--><script>(function(){var tb=document.getElementById("topbar");if(tb){var a=document.createElement("a");a.href="http://127.0.0.1:8091/";a.className="tb-admin";a.textContent="查看后台";tb.appendChild(a);}})();</script><!--ADMIN_LINK_END--><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script>

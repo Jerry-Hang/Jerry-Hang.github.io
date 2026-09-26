@@ -264,6 +264,24 @@ function toggleSidebar(force) {
   document.getElementById("layout").classList.toggle("side-open", open);
   const grip = document.getElementById("side-grip");
   if (grip) grip.setAttribute("aria-expanded", open ? "true" : "false");
+  // 宽屏下手动操作过一次就记住，下次打开不再自动展开
+  if (window.innerWidth >= 1000) {
+    try { localStorage.setItem("jb_side", open ? "open" : "closed"); } catch (e) { /* 隐私模式忽略 */ }
+  }
+}
+
+/// 宽屏首次进入时自动展开目录栏。
+///
+/// 侧栏（胶囊目录）在移动端是汉堡抽屉：默认收起、点按钮展开。
+/// 但桌面上有 300px 的横向空间，一直收着会让左侧留一条 2px 的缝、
+/// 导航被推到屏幕中间，看起来像坏掉了。所以宽屏默认展开一次；
+/// 用户手动收起过（localStorage 有记录）就尊重用户的选择。
+function initSidebarDefault() {
+  if (window.innerWidth < 1000) return;
+  let saved = null;
+  try { saved = localStorage.getItem("jb_side"); } catch (e) { /* 忽略 */ }
+  if (saved === "closed") return;
+  document.getElementById("layout").classList.add("side-open");
 }
 function renderModes() {
   const box = document.getElementById("side-modes");
@@ -1140,7 +1158,17 @@ function openFromHashIfAny() {
 (function init() {
   applyTheme();
   applyWall();
-  toggleSidebar(false);
+  // 侧栏初始状态：
+  //   窄屏 —— 收起（汉堡抽屉，点按钮展开）
+  //   宽屏 —— 默认展开，除非用户之前手动收起过
+  //
+  // 原来这里无条件写 toggleSidebar(false)，把宽屏也强制收起了，
+  // 结果桌面侧栏只剩 34px 的细轨道、左边留一道缝，导航被推到屏幕中间。
+  if (window.innerWidth < 1000) {
+    toggleSidebar(false);
+  } else {
+    initSidebarDefault();
+  }
   showView("home");
   loadPosts();
 })();
