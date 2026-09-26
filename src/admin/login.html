@@ -115,21 +115,19 @@ body.login::before {
 <form class="login-card" id="f" autocomplete="on">
   <div class="brand">J</div>
   <h1>博客后台</h1>
-  <p class="hint">请登录以继续</p>
+  <p class="hint">请输入密码</p>
 
   <div class="err" id="err"></div>
 
-  <div class="field">
-    <label for="u">用户名</label>
-    <input class="input" id="u" name="username" type="text"
-           autocomplete="username" autocapitalize="off"
-           autocorrect="off" spellcheck="false" required autofocus>
-  </div>
+  <!-- 用户名由服务端在渲染时注入，不在页面上暴露输入框：
+       本站只有一个账号，让用户多打一遍用户名是多余的。
+       隐藏字段同时保证密码管理器仍能正常工作。 -->
+  <input type="hidden" id="u" name="username" value="__USERNAME__">
 
   <div class="field">
     <label for="p">密码</label>
     <input class="input" id="p" name="password" type="password"
-           autocomplete="current-password" required>
+           autocomplete="current-password" required autofocus>
   </div>
 
   <button class="btn primary" id="go" type="submit">
@@ -158,8 +156,8 @@ body.login::before {
     e.preventDefault();
     err.classList.remove('show');
 
-    if (!u.value || !p.value) {
-      showErr('请填写用户名和密码');
+    if (!p.value) {
+      showErr('请输入密码');
       return;
     }
 
@@ -180,7 +178,7 @@ body.login::before {
         location.replace('/');
         return;
       }
-      showErr(d.error || (r.status === 401 ? '用户名或密码不正确' : '登录失败（HTTP ' + r.status + '）'));
+      showErr(d.error || (r.status === 401 ? '密码不正确' : '登录失败（HTTP ' + r.status + '）'));
     } catch (_) {
       showErr('无法连接服务，请确认博客服务正在运行');
     }

@@ -48,6 +48,9 @@ const CSS_PLACEHOLDER: &str = "/*__CSS__*/";
 const JS_PLACEHOLDER: &str = "//__JS__";
 /// 「返回博客前台」链接的占位符，运行时按请求上下文替换。
 const PUBLIC_URL_PLACEHOLDER: &str = "__PUBLIC_URL__";
+/// 登录页用户名的占位符。本站只有一个账号，登录页不显示用户名输入框，
+/// 由服务端把配置里的用户名注入到隐藏字段，避免把它写死在模板里。
+const USERNAME_PLACEHOLDER: &str = "__USERNAME__";
 /// 前台地址的默认值（本机）。
 /// 管理端在 8091，前台在 8090 —— 两个端口，所以不能用相对路径 `/`，
 /// 那样会指回管理端自己，被 302 弹回登录页（实际踩过这个坑）。
@@ -113,6 +116,67 @@ fn public_url(headers: &HeaderMap) -> String {
 /// 把占位符换成实际地址。
 fn inject_public_url(html: &str, url: &str) -> String {
     html.replace(PUBLIC_URL_PLACEHOLDER, url)
+}
+
+/// 往 HTML 属性里插值时的最小转义，避免用户名里的引号破坏属性结构。
+fn html_attr_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// 判断这次请求是不是「本机访问」。
+///
+/// 两个条件都要满足：
+///   1. 连接来自回环地址（peer 是 127.0.0.1）
+///   2. Host 头也是回环名字（127.0.0.1 / localhost）
+///
+/// 为什么不能只看第 1 条：从本机用 `curl -H "Host: 192.168.2.217:8090"` 打过去，
+/// peer 仍是 127.0.0.1，但那模拟的是局域网访问，不该显示「查看后台」。
+/// 只看 peer 会让这个判断在任何测试里都为真，等于没做。
+fn is_local_access(peer_ip: &std::net::IpAddr, headers: &HeaderMap) -> bool {
+    if !peer_ip.is_loopback() {
+        return false;
+    }
+    match headers.get(header::HOST).and_then(|v| v.to_str().ok()) {
+        Some(h) => {
+            let h = h.trim().to_ascii_lowercase();
+            let name = if let Some(rest) = h.strip_prefix('[') {
+                rest.split("]:").next().unwrap_or(rest).to_string()
+            } else {
+                h.split(':').next().unwrap_or("").to_string()
+            };
+            name == "127.0.0.1" || name == "localhost" || name == "::1" || name.starts_with("127.")
+        }
+        // 没有 Host 头（HTTP/1.0）时按本机处理，避免误删
+        None => true,
+    }
+}
+
+/// 本机专用内容的标记。前后这对注释之间包住「查看后台」按钮的注入脚本：
+/// 本机访问保留，局域网/外网访问整段删掉 —— 管理端只绑 127.0.0.1，
+/// 外面的人点了也打不开，不如不显示。
+const LOCAL_ONLY_START: &str = "<!--ADMIN_LINK_START-->";
+const LOCAL_ONLY_END: &str = "<!--ADMIN_LINK_END-->";
+
+/// 把 HTML 里标记为「仅本机」的片段删掉。
+fn strip_local_only(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(a) = rest.find(LOCAL_ONLY_START) {
+        out.push_str(&rest[..a]);
+        match rest[a..].find(LOCAL_ONLY_END) {
+            Some(b) => rest = &rest[a + b + LOCAL_ONLY_END.len()..],
+            None => {
+                // 标记不成对就不动，避免误删后面所有内容
+                out.push_str(&rest[a..]);
+                return out;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 #[derive(Clone)]
@@ -315,12 +379,12 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
     let ua = ua_of(&req);
-    let resp = external_dispatch(&state, req).await;
+    let resp = external_dispatch(&state, &peer, req).await;
     log_response(&state, &peer, &method, &path, &ua, &resp);
     resp
 }
 
-async fn external_dispatch(state: &Arc<AppState>, req: Request) -> Response {
+async fn external_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) -> Response {
     let method = req.method().clone();
     if method != Method::GET && method != Method::HEAD {
         return not_found();
@@ -330,7 +394,9 @@ async fn external_dispatch(state: &Arc<AppState>, req: Request) -> Response {
     }
     let _guard = GateGuard(state.gate.clone());
     let path = req.uri().path().to_string();
-    read_handler(state, &path, method == Method::HEAD).await
+    // 公网口：按 peer + Host 判断是不是本机；不是就把「查看后台」那段删掉
+    let local = is_local_access(&peer.ip(), req.headers());
+    read_handler(state, &path, method == Method::HEAD, local, req.headers()).await
 }
 
 async fn local_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer): ConnectInfo<SocketAddr>, req: Request) -> Response {
@@ -360,7 +426,7 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
             if session_cookies_ok(state, req.headers()).is_some() {
                 return redirect_to_home();
             }
-            return login_page(req.headers());
+            return login_page(req.headers(), &state.cfg.read().unwrap().username);
         }
 
         let cookies = match session_cookies_ok(state, req.headers()) {
@@ -373,7 +439,10 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
         } else {
             // 后台域名下不再挂公网静态文件：原来这里直接 read_handler 放行，
             // 等于 /index.html 等路径完全绕过认证（实测无凭据返回 200）。
-            read_handler(state, &path, method == Method::HEAD).await
+            // local 仍要带 Host 判断：peer 一定是回环（本函数开头已校验），
+            // 但用 Host: 192.168.x.x 打过来模拟的是局域网访问。
+            let local = is_local_access(&peer.ip(), req.headers());
+            read_handler(state, &path, method == Method::HEAD, local, req.headers()).await
         };
         add_cookies(&mut resp, &cookies);
         return resp;
@@ -461,12 +530,39 @@ fn add_cookies(resp: &mut Response, cookies: &[(String, String, i64)]) {
     }
 }
 
-async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool) -> Response {
+async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool, local: bool, headers: &HeaderMap) -> Response {
     match path {
         "/posts.json" => serve_posts_json(state).await,
         _ if path.starts_with("/post/") => serve_post_html(state, &path["/post/".len()..]).await,
-        _ => serve_static(&state.root_canon, path).await,
+        _ => read_static(state, path, local).await,
     }
+}
+
+/// 读静态文件。HTML 需要按来源裁剪（删掉「仅本机」片段），其余原样返回。
+///
+/// local = 是否本机访问（见 is_local_access）。
+///         为 false 时把「查看后台」那段删掉 —— 管理端只绑 127.0.0.1，
+///         局域网和外网的人点了也打不开，不如不显示。
+async fn read_static(state: &Arc<AppState>, path: &str, local: bool) -> Response {
+    // 先确认是 HTML 才读进内存做替换；其余文件走原来的静态文件路径
+    let is_html = match resolve_target(&state.root_canon, path) {
+        Some(ref f) => content_type(f).starts_with("text/html"),
+        None => path == "/" || path.ends_with('/'),
+    };
+
+    if !is_html {
+        return serve_static(&state.root_canon, path).await;
+    }
+
+    let Some(file) = resolve_target(&state.root_canon, path) else {
+        return not_found();
+    };
+    let Ok(bytes) = fs::read(&file) else { return not_found() };
+    let Ok(text) = String::from_utf8(bytes) else {
+        return not_found();
+    };
+
+    html_response(if local { text } else { strip_local_only(&text) })
 }
 
 async fn serve_posts_json(state: &Arc<AppState>) -> Response {
@@ -952,12 +1048,17 @@ fn admin_dashboard(headers: &HeaderMap) -> Response {
     html_response(inject_public_url(&html, &public_url(headers)))
 }
 
-fn login_page(headers: &HeaderMap) -> Response {
-    // 同样要把公共样式内联进来。
-    // 登录页不能引用 /_admin/admin.css —— 那个路径受认证保护，
-    // 未登录请求会被跳回登录页本身，浏览器收到 HTML 当 CSS 用，样式就丢了。
+fn login_page(headers: &HeaderMap, username: &str) -> Response {
+    // 三处替换都是必须的：
+    //   CSS        —— 登录页不能引用 /_admin/admin.css（那个路径受认证保护，
+    //                 未登录请求会被跳回登录页，浏览器把 HTML 当 CSS 用，样式就丢）
+    //   public_url —— 管理端在 8091、前台在 8090，不能用相对路径
+    //   username   —— 本站只有一个账号，登录页不显示用户名输入框，
+    //                 由服务端注入到隐藏字段，避免写死在模板里
     let html = LOGIN_HTML.replacen(CSS_PLACEHOLDER, ADMIN_CSS, 1);
-    html_response(inject_public_url(&html, &public_url(headers)))
+    let html = inject_public_url(&html, &public_url(headers));
+    let html = html.replacen(USERNAME_PLACEHOLDER, &html_attr_escape(username), 1);
+    html_response(html)
 }
 
 fn html_response(body: String) -> Response {

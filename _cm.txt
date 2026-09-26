@@ -1,0 +1,32 @@
+﻿fix(admin,frontend): password-only login, local-only admin button, theme-aware bg
+
+登录
+- 取消用户名输入框，只留密码（本站只有一个账号）
+- 用户名由服务端注入隐藏字段，不写死在模板里
+- 新增 USERNAME_PLACEHOLDER + html_attr_escape
+
+「查看后台」只在本机显示
+- index.html 里用 <!--ADMIN_LINK_START--> ... <!--ADMIN_LINK_END--> 包住注入脚本
+- 服务端 is_local_access() 同时看 peer IP 和 Host 头，非本机时 strip_local_only() 删掉
+- 只判 peer 是不够的：从本机 curl -H "Host: 192.168.x.x" 打过去 peer 仍是回环，
+  那样的判断在任何测试里都为真，等于没做（这个坑实测踩到）
+- 新增 read_static()，只有 HTML 才读进内存做裁剪，其余走原路径
+
+明暗切换失效
+- 原因：body.home-bg / body.reading 上写死的 !important 深色渐变把主题盖掉了
+- 改成主题感知：深色用深叠层，亮色用浅蒙版 + 浅底卡片 + 深色文字
+- 原来超时的 read_handler 签名顺带带上 local/headers
+
+首页布局
+- 大卡那篇不再重复出现在「最新更新」和下方网格（原来同一篇出现三次）
+- 个人简介固定取自述/关于那篇（原来退化成 list[0]，显示的是最新技术文摘要）
+- 每页数量 6 -> 9
+
+顶栏
+- 改成浮动胶囊：position sticky + top 12px + 两侧留白 + 全圆角
+- 导航项做成胶囊按钮，选中用底色而非下划线
+- 主题/汉堡按钮改圆形，hover 微旋转
+- 卡片圆角统一放大（hero 28 / side 24 / grid 22）
+
+说明：本次 server.rs 一度被脚本损坏（PowerShell 按 ANSI 读 UTF-8 导致中文乱码，
+正则又吃掉了字符串引号），已 git checkout 恢复后重做，现文件无 BOM、中文完好。

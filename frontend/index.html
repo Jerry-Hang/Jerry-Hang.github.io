@@ -1239,18 +1239,122 @@ body:not(.dark) .menubar.scrolled,body:not(.dark) .taskbar.scrolled,body:not(.da
    装饰上统一用玻璃拟态（半透明 + backdrop-filter），配合固定背景图。
    ========================================================================== */
 
-/* ---------- 背景层：固定大图 + 暗色叠层 ---------- */
-body.home-bg {
-  background: #0a0f1a !important;
-  background-image:
-    linear-gradient(180deg, rgba(6,10,20,.55) 0%, rgba(6,10,20,.72) 45%, rgba(6,10,20,.88) 100%),
-    url("/assets/banner.jpg") !important;
+/* ---------- 背景层：固定大图 + 主题相关的叠层 ----------
+   注意：这里必须区分明暗两套叠层，否则 body 上写死的 !important 深色渐变
+   会把主题切换盖掉 —— 表现成「点了明暗切换没反应」。 */
+body.home-bg,
+body.reading {
+  background-color: #0a0f1a !important;
   background-size: cover !important;
   background-position: center 30% !important;
   background-attachment: fixed !important;
   background-repeat: no-repeat !important;
 }
+
+/* 深色：叠层重，文字压得住 */
+body.home-bg,
+body.reading {
+  background-image:
+    linear-gradient(180deg, rgba(6,10,20,.55) 0%, rgba(6,10,20,.72) 45%, rgba(6,10,20,.88) 100%),
+    url("/assets/banner.jpg") !important;
+}
+body.reading.dark {
+  background-image:
+    linear-gradient(180deg, rgba(6,10,20,.80) 0%, rgba(6,10,20,.90) 40%, rgba(6,10,20,.95) 100%),
+    url("/assets/banner.jpg") !important;
+}
+
+/* 亮色：叠层换成浅色蒙版，整体提亮 —— 这样切到亮色能明显看出来 */
+body.home-bg:not(.dark) {
+  background-color: #eef2f8 !important;
+  background-image:
+    linear-gradient(180deg, rgba(240,244,252,.80) 0%, rgba(238,242,250,.86) 45%, rgba(236,241,249,.92) 100%),
+    url("/assets/banner.jpg") !important;
+}
+body.reading:not(.dark) {
+  background-color: #f2f5fa !important;
+  background-image:
+    linear-gradient(180deg, rgba(244,247,252,.90) 0%, rgba(242,245,251,.94) 40%, rgba(240,244,250,.96) 100%),
+    url("/assets/banner.jpg") !important;
+}
 /* 关掉极光那层的噪点，避免和背景图打架 */
+body.home-bg::before,
+body.reading::before { display: none !important; }
+
+/* ---------- 亮色主题下的卡片文字色 ----------
+   卡片底色偏深是深色主题的设计；亮色下要整体换成浅底深字，
+   否则会出现「浅背景 + 半透明深卡 + 深字」这种看不清的组合。 */
+body.home-bg:not(.dark) .hero-card,
+body.home-bg:not(.dark) .side-card,
+body.home-bg:not(.dark) .home-grid .home-item,
+body.reading:not(.dark) .reader-head,
+body.reading:not(.dark) #r-body,
+body.reading:not(.dark) .toc,
+body.reading:not(.dark) .reader-foot,
+body.reading:not(.dark) .r-related {
+  background: rgba(255,255,255,.78) !important;
+  border-color: rgba(15,23,42,.10) !important;
+  box-shadow: 0 12px 36px rgba(30,41,59,.14) !important;
+}
+body.home-bg:not(.dark) .hc-title,
+body.home-bg:not(.dark) .hc-tag,
+body.home-bg:not(.dark) .pc-name { color: #0f172a !important; }
+body.home-bg:not(.dark) .hc-desc,
+body.home-bg:not(.dark) .pc-bio,
+body.home-bg:not(.dark) .sc-title,
+body.home-bg:not(.dark) .sc-links a,
+body.home-bg:not(.dark) .home-grid .home-item .hi-title,
+body.home-bg:not(.dark) .home-grid .home-item .hi-excerpt { color: #1e293b !important; }
+body.home-bg:not(.dark) .hc-meta,
+body.home-bg:not(.dark) .pc-sub,
+body.home-bg:not(.dark) .sc-date,
+body.home-bg:not(.dark) .sc-head,
+body.home-bg:not(.dark) .sec-head,
+body.home-bg:not(.dark) .home-grid .home-item .hi-meta { color: rgba(30,41,59,.55) !important; }
+body.home-bg:not(.dark) .hc-tag {
+  background: rgba(37,99,235,.10) !important;
+  border-color: rgba(37,99,235,.22) !important;
+  color: #1d4ed8 !important;
+}
+body.home-bg:not(.dark) .pc-tag,
+body.home-bg:not(.dark) .home-grid .home-item .p-tag {
+  background: rgba(15,23,42,.06) !important;
+  border-color: rgba(15,23,42,.10) !important;
+  color: rgba(30,41,59,.7) !important;
+}
+body.home-bg:not(.dark) .hc-meta { border-top-color: rgba(15,23,42,.10) !important; }
+body.home-bg:not(.dark) .sc-item,
+body.home-bg:not(.dark) .sc-links a { border-top-color: rgba(15,23,42,.08) !important; }
+body.home-bg:not(.dark) .sec-head::after {
+  background: linear-gradient(90deg, rgba(15,23,42,.14), transparent) !important;
+}
+body.home-bg:not(.dark) .home-more .pager {
+  background: rgba(255,255,255,.72) !important;
+  border-color: rgba(15,23,42,.10) !important;
+}
+body.home-bg:not(.dark) .home-more .pager .pg-btn,
+body.home-bg:not(.dark) .home-more .pager .pg-input {
+  background: rgba(15,23,42,.05) !important;
+  border-color: rgba(15,23,42,.12) !important;
+  color: #1e293b !important;
+}
+body.reading:not(.dark) .md-body { color: #1e293b !important; }
+body.reading:not(.dark) .md-body h1,
+body.reading:not(.dark) .md-body h2,
+body.reading:not(.dark) .md-body h3,
+body.reading:not(.dark) .md-body h4 { color: #0f172a !important; }
+body.reading:not(.dark) .md-body a { color: #2563eb !important; }
+body.reading:not(.dark) .md-body pre {
+  background: rgba(15,23,42,.05) !important;
+  border-color: rgba(15,23,42,.10) !important;
+}
+body.reading:not(.dark) .md-body :not(pre) > code {
+  background: rgba(15,23,42,.06) !important;
+  color: #2563eb !important;
+}
+
+/* 题目要求的背景层 */
+/* 关掉极光那层的噪点，避免和背景图打架（颜色在文件上面的主题区块里定义） */
 body.home-bg::before { display: none !important; }
 
 /* ---------- 玻璃容器 ---------- */
@@ -1431,6 +1535,7 @@ body.home-bg::before { display: none !important; }
   transition: color .16s var(--ease);
 }
 .sc-date { display: block; font-size: 11.5px; color: rgba(235,240,255,.4); margin-top: 3px; }
+.sc-empty { font-size: 13px; color: rgba(235,240,255,.4); padding: 4px 0; }
 
 /* 站内链接 */
 .sc-links { display: flex; flex-direction: column; gap: 2px; }
@@ -1603,83 +1708,122 @@ body.home-bg::before { display: none !important; }
 /* ==========================================================================
    顶栏统一成玻璃风格
    --------------------------------------------------------------------------
-   原来这块是「各写各的」：导航是玻璃、查看后台按钮是青紫渐变、主题按钮又是另一种。
-   三个视觉体系混在一行里，看起来乱。这里统一：
-     · 顶栏底色和边框统一，去掉某一条规则单独加粗边框的情况
-     · 所有按钮/胶囊共用一套玻璃底 + 同样的 hover
-     · 「查看后台」保留一点强调色，但改成淡蓝玻璃而不是高饱和渐变
+   参考的观感是「浮动胶囊」：不贴屏幕边缘、两端全圆角、悬浮在内容之上，
+   而不是一条贴边的直条。原来这里也是「各写各的」——导航玻璃、
+   查看后台青紫渐变、主题按钮又是一种，三个体系混在一行。
    ========================================================================== */
 
-/* 顶栏容器：统一底色与描边 */
+/* 顶栏容器：浮动胶囊 */
 #topbar,
 .menubar, .taskbar, .top-bar, #taskbar, #menubar {
-  background: rgba(10, 14, 26, .55) !important;
-  border-bottom: 1px solid rgba(255,255,255,.08) !important;
-  backdrop-filter: blur(18px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  position: sticky !important;
+  top: 12px !important;
+  margin: 12px clamp(10px, 2.2vw, 28px) 0 !important;
+  padding: 8px clamp(12px, 1.6vw, 18px) !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  background: rgba(12, 17, 30, .52) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07) !important;
 }
+/* 滚动后只加深一点阴影，不换底色（避免生硬的跳变） */
 #topbar.scrolled,
 .menubar.scrolled, .taskbar.scrolled, .top-bar.scrolled,
 #taskbar.scrolled, #menubar.scrolled {
-  background: rgba(8, 11, 20, .78) !important;
-  box-shadow: 0 1px 0 rgba(255,255,255,.06), 0 6px 24px rgba(0,0,0,.28) !important;
+  background: rgba(10, 14, 26, .72) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.09) !important;
 }
 
-/* 导航项：统一字重与间距，去掉下划线动画的突兀感 */
+/* 导航项：做成胶囊按钮，链接触感更柔和 */
+#tb-tabs { gap: 4px !important; }
 #tb-tabs button {
   font-weight: 500 !important;
-  color: rgba(235,240,255,.62) !important;
-  transition: color .18s var(--ease) !important;
+  color: rgba(235,240,255,.68) !important;
+  padding: 7px 15px !important;
+  border-radius: 999px !important;
+  transition: color .2s var(--ease), background .2s var(--ease) !important;
 }
-#tb-tabs button:hover { color: rgba(240,244,255,.9) !important; }
-#tb-tabs button.on { color: #fff !important; }
-#tb-tabs button::after { background: #93c5fd !important; }
+#tb-tabs button:hover {
+  color: rgba(245,248,255,.95) !important;
+  background: rgba(255,255,255,.07) !important;
+}
+#tb-tabs button.on {
+  color: #fff !important;
+  background: rgba(255,255,255,.13) !important;
+}
+/* 去掉下划线动画，改用胶囊底色表示选中（参考站就是这么做的） */
+#tb-tabs button::after { display: none !important; }
 
-/* 「查看后台」：从青紫渐变改成淡蓝玻璃
-   实测过各宽度下的计算样式完全一致，所以这里的对比度要一次调够：
-   原来底色 alpha 只有 .16、边框 .35，在浅色背景图区域会显得发虚。 */
+/* 「查看后台」：淡蓝玻璃胶囊 */
 .tb-admin {
   background: rgba(96, 165, 250, .24) !important;
-  border: 1px solid rgba(96, 165, 250, .55) !important;
+  border: 1px solid rgba(96, 165, 250, .5) !important;
   color: #dbeafe !important;
   font-weight: 600 !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,.22) !important;
-  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease) !important;
+  border-radius: 999px !important;
+  padding: 6px 15px !important;
+  box-shadow: none !important;
+  transition: background .2s var(--ease), border-color .2s var(--ease), color .2s var(--ease) !important;
 }
 .tb-admin:hover {
   background: rgba(96, 165, 250, .4) !important;
-  border-color: rgba(147, 197, 253, .8) !important;
+  border-color: rgba(147, 197, 253, .75) !important;
   color: #fff !important;
   transform: none !important;
 }
 
-/* 主题切换、汉堡菜单按钮：同样玻璃化，尺寸对齐 */
+/* 主题切换、汉堡菜单：圆形玻璃按钮，和胶囊呼应 */
 .icon-btn, .tb-menu {
-  width: 34px !important;
-  height: 34px !important;
-  border-radius: 10px !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
   background: rgba(255,255,255,.07) !important;
   border: 1px solid rgba(255,255,255,.12) !important;
-  color: rgba(235,240,255,.8) !important;
+  color: rgba(235,240,255,.85) !important;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  transition: background .18s var(--ease), color .18s var(--ease) !important;
+  transition: background .2s var(--ease), color .2s var(--ease), transform .2s var(--ease) !important;
 }
 .icon-btn:hover, .tb-menu:hover {
-  background: rgba(255,255,255,.14) !important;
+  background: rgba(255,255,255,.16) !important;
   color: #fff !important;
+  transform: rotate(15deg);
 }
 
-/* 品牌区：头像加个细描边，跟卡片风格一致 */
+/* 品牌区 */
+#tb-brand { gap: 10px !important; }
 #tb-brand img {
-  border: 1px solid rgba(255,255,255,.18) !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,.3);
+  border: 1px solid rgba(255,255,255,.2) !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+#tb-brand b { font-weight: 600 !important; letter-spacing: -.01em; }
+
+@media (pointer: coarse) {
+  .icon-btn, .tb-menu { width: 40px !important; height: 40px !important; }
 }
 
-/* 触摸设备上按钮大一点 */
-@media (pointer: coarse) {
-  .icon-btn, .tb-menu { width: 38px !important; height: 38px !important; }
+/* ---------- 卡片圆角统一放大，弱化棱角 ---------- */
+.hero-card { border-radius: 28px !important; }
+.side-card { border-radius: 24px !important; }
+.home-grid .home-item { border-radius: 22px !important; }
+.home-more .pager { border-radius: 999px !important; }
+body.reading .reader-head,
+body.reading .toc,
+body.reading .reader-foot,
+body.reading .r-related,
+body.reading #r-body { border-radius: 24px !important; }
+
+/* 作者卡片：加一层极淡的渐变，避免大块纯色显得平 */
+.profile-card {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(96,165,250,.14), transparent 62%),
+    rgba(16, 22, 38, .62) !important;
+}
+.pc-avatar {
+  border-radius: 50% !important;
+  border: 2px solid rgba(255,255,255,.22) !important;
 }
 
 /* ---------- 背景图统一到文章页 ---------- */
@@ -1737,7 +1881,7 @@ body.reading .md-body th { border-color: rgba(255,255,255,.1); }
 </style>
 <script>
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
-</script><script>(function(){var tb=document.getElementById("topbar");if(tb){var a=document.createElement("a");a.href="http://127.0.0.1:8091/";a.className="tb-admin";a.textContent="查看后台";tb.appendChild(a);}})();</script><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script>
+</script><!--ADMIN_LINK_START--><script>(function(){var tb=document.getElementById("topbar");if(tb){var a=document.createElement("a");a.href="http://127.0.0.1:8091/";a.className="tb-admin";a.textContent="查看后台";tb.appendChild(a);}})();</script><!--ADMIN_LINK_END--><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script>
 
 <!-- 阅读增强所需的元素（进度条 / 图片灯箱 / 回到顶部） -->
 <div id="read-progress" aria-hidden="true"></div>

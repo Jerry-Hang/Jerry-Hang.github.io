@@ -452,13 +452,29 @@ function renderHome() {
 
   /* ---------- 右栏：作者卡片 + 最新更新 + 站内链接 ---------- */
 
-  // 简介：从「关于」类文章里取，取不到就用站点默认
-  const aboutPost = list.find(p => (p.categories || []).some(c => c === "自述" || c === "关于")) || list[0];
+  // 简介固定取「自述/关于」那篇。
+  // 之前这里退化成 list[0]（最新一篇），结果作者卡片里显示的是最新技术文的摘要，
+  // 跟「作者简介」完全不搭。
+  const aboutPost =
+    list.find(p => p.slug === "about-me") ||
+    list.find(p => (p.categories || []).some(c => c === "自述" || c === "关于")) ||
+    list.find(p => /自述|关于|自我介绍|about/i.test(p.title || "")) ||
+    null;
   const bioEl = document.getElementById("pc-bio");
   if (bioEl) {
-    bioEl.textContent = (aboutPost && aboutPost.desc)
-      ? aboutPost.desc
-      : "一个用 Rust 命令行工具与原生 HTML/CSS/JS 打造的胶囊目录静态博客。";
+    if (aboutPost && aboutPost.desc) {
+      bioEl.textContent = aboutPost.desc;
+    } else if (aboutPost && aboutPost.body) {
+      // 没有 desc 就从正文截一段，去掉 markdown 标记
+      const plain = String(aboutPost.body)
+        .replace(/^#+\s.*$/gm, "")
+        .replace(/[*_`>\[\]()!]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      bioEl.textContent = plain.slice(0, 90) + (plain.length > 90 ? "…" : "");
+    } else {
+      bioEl.textContent = "一个用 Rust 命令行工具与原生 HTML/CSS/JS 打造的胶囊目录静态博客。";
+    }
   }
 
   // 标签胶囊：用文章里出现最多的几个标签
@@ -470,22 +486,28 @@ function renderHome() {
     tagBox.innerHTML = topTags.map(t => '<span class="pc-tag">' + esc(t) + '</span>').join("");
   }
 
-  // 最新更新：按日期倒序取 4 篇
-  const latest = list.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 4);
+  /* ---------- 大卡：置顶优先，否则最新一篇 ---------- */
+  // 先定 hero，右栏的「最新更新」和下方网格都要把它排除掉，
+  // 否则同一篇会同时出现在三个地方。
+  const byDate = list.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  const hero = list.find(p => p.pinned) || byDate[0];
+
+  // 最新更新：排除 hero 之后的最近 4 篇
+  const latest = byDate.filter(p => p !== hero).slice(0, 4);
   const listBox = document.getElementById("latest-list");
   if (listBox) {
-    listBox.innerHTML = latest.map(p => {
-      const idx = list.indexOf(p);
-      return '<button class="sc-item" data-idx="' + idx + '">' +
-        '<span class="sc-title">' + esc(p.title) + '</span>' +
-        '<span class="sc-date">' + esc(p.date || "") + '</span>' +
-      '</button>';
-    }).join("");
+    listBox.innerHTML = latest.length
+      ? latest.map(p => {
+          const idx = list.indexOf(p);
+          return '<button class="sc-item" data-idx="' + idx + '">' +
+            '<span class="sc-title">' + esc(p.title) + '</span>' +
+            '<span class="sc-date">' + esc(p.date || "") + '</span>' +
+          '</button>';
+        }).join("")
+      : '<div class="sc-empty">暂无其他文章</div>';
     $$("#latest-list .sc-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
   }
 
-  /* ---------- 大卡：置顶优先，否则最新一篇 ---------- */
-  const hero = list.find(p => p.pinned) || latest[0];
   const heroBox = document.getElementById("hero-card");
   if (heroBox && hero) {
     const idx = list.indexOf(hero);
@@ -507,11 +529,13 @@ function renderHome() {
         '</div>' +
       '</div>';
     heroBox.onclick = () => selectArticle(idx);
+  } else if (heroBox) {
+    heroBox.innerHTML = "";
   }
 
   /* ---------- 下方网格：排除大卡那篇，其余分页 ---------- */
   const rest = list.filter(p => p !== hero);
-  const perPage = (window.innerWidth <= 720 ? 4 : 6);
+  const perPage = (window.innerWidth <= 720 ? 6 : 9);
   const pages = Math.max(1, Math.ceil(rest.length / perPage));
   if (state.pinnedPage > pages) state.pinnedPage = pages;
   const start = (state.pinnedPage - 1) * perPage;
