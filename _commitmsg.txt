@@ -1,0 +1,21 @@
+fix(admin): point front-end links at the real port
+
+问题：管理端在 8091、前台在 8090，是两个端口。
+登录页的「← 返回博客前台」和后台顶栏的「前台 ↗」都写的是 href="/"，
+在管理端页面里就指回管理端自己，被 302 弹回登录页 —— 表现成「点了没反应」。
+
+修法：
+- 两个模板改用 __PUBLIC_URL__ 占位符，运行时替换
+- public_url() 按请求的 Host 头判断：
+    * Host 带管理端口（8091）-> 换成前台端口 8090
+      （覆盖本机 127.0.0.1 / localhost / 局域网 IP 三种情况）
+    * Host 不带端口（经隧道）-> 直接用域名
+    * 没有 Host 头          -> 回落到 BLOG_PUBLIC_URL
+- 前台端口从 BLOG_EXT_ADDR 推导，不写死 8090
+- 新增 BLOG_PUBLIC_URL 配置项（启动脚本 + config.env.ps1，含注释说明）
+- 补 use std::env
+
+实测五种 Host 都能得到可访问的链接：
+  127.0.0.1:8091 / localhost:8091 / 192.168.*:8091 -> http://...:8090/
+  jerry-hang.blog                                  -> http://jerry-hang.blog/
+浏览器实测：登录页点「返回前台」能正常跳到博客前台。

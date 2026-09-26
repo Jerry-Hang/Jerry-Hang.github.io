@@ -41,6 +41,11 @@ $BLOG_CPUS           = '0-3'
 $BLOG_MAX_CONCURRENT = '2400'
 $BLOG_EXT_ADDR       = '0.0.0.0:8090'
 $BLOG_LOCAL_ADDR     = '127.0.0.1:8091'
+# 前台地址。管理端页面上的「前台 ↗」「返回博客前台」链接用它。
+# 不能用相对路径 /，因为管理端在 8091、前台在 8090 是两个端口，
+# / 会指回管理端自己，被 302 弹回登录页（实际踩过这个坑）。
+# 经隧道/局域网访问时服务端会优先用请求的 Host 头，这个值只作本机回落。
+$BLOG_PUBLIC_URL     = 'http://127.0.0.1:8090/'
 $BLOG_ROOT           = Join-Path $Root 'frontend'
 $BLOG_DB             = Join-Path $Root 'blog.db'
 $BLOG_CONFIG         = Join-Path $Root 'config.toml'
@@ -82,6 +87,7 @@ $env:BLOG_CPUS           = $BLOG_CPUS
 $env:BLOG_MAX_CONCURRENT = $BLOG_MAX_CONCURRENT
 $env:BLOG_EXT_ADDR       = $BLOG_EXT_ADDR
 $env:BLOG_LOCAL_ADDR     = $BLOG_LOCAL_ADDR
+$env:BLOG_PUBLIC_URL     = $BLOG_PUBLIC_URL
 $env:BLOG_ROOT           = $BLOG_ROOT
 $env:BLOG_DB             = $BLOG_DB
 $env:BLOG_CONFIG         = $BLOG_CONFIG

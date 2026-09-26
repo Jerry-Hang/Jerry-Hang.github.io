@@ -1,5 +1,6 @@
 //! Tokio + axum async dual-port dynamic blog server with request-log threat monitoring.
 
+use std::env;
 use std::fs;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -45,6 +46,74 @@ const LOGIN_HTML: &str = include_str!("admin/login.html");
 
 const CSS_PLACEHOLDER: &str = "/*__CSS__*/";
 const JS_PLACEHOLDER: &str = "//__JS__";
+/// 「返回博客前台」链接的占位符，运行时按请求上下文替换。
+const PUBLIC_URL_PLACEHOLDER: &str = "__PUBLIC_URL__";
+/// 前台地址的默认值（本机）。
+/// 管理端在 8091，前台在 8090 —— 两个端口，所以不能用相对路径 `/`，
+/// 那样会指回管理端自己，被 302 弹回登录页（实际踩过这个坑）。
+const DEFAULT_PUBLIC_URL: &str = "http://127.0.0.1:8090/";
+
+/// 决定「返回前台」应该指向哪个地址。
+///
+/// 优先看请求的 Host 头：
+///   · 经 Cloudflare 隧道访问时 Host 是 jerry-hang.blog，直接用它最自然
+///   · 局域网用 192.168.x.x:8091 访问时，把管理端口换成前台端口
+///   · 本机 127.0.0.1:8091 同样换成前台端口
+///
+/// 为什么要换端口：管理端在 8091、前台在 8090。
+/// Host 里带的是**管理端**的端口，直接拿去拼链接会指回管理端自己，
+/// 被 302 弹回登录页 —— 表现成「点了没反应」。这个坑实际踩过两次：
+/// 先是写死相对路径 `/`，再是直接拿 Host 拼。
+///
+/// BLOG_PUBLIC_URL 用来兜底（没有 Host 头时），默认 http://127.0.0.1:8090/。
+fn public_url(headers: &HeaderMap) -> String {
+    let ext_port = env::var("BLOG_EXT_ADDR")
+        .ok()
+        .and_then(|a| a.rsplit(':').next().map(|s| s.to_string()))
+        .unwrap_or_else(|| "8090".to_string());
+
+    let configured = env::var("BLOG_PUBLIC_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_PUBLIC_URL.to_string());
+
+    let Some(host) = headers.get(header::HOST).and_then(|v| v.to_str().ok()) else {
+        return configured;
+    };
+    let h = host.trim().to_ascii_lowercase();
+    if h.is_empty() {
+        return configured;
+    }
+
+    // IPv6 字面量：[::1]:8091
+    if let Some(rest) = h.strip_prefix('[') {
+        if let Some((addr, port)) = rest.split_once("]:") {
+            return if port == ext_port {
+                format!("http://[{addr}]:{ext_port}/")
+            } else {
+                format!("http://[{addr}]/")
+            };
+        }
+    }
+
+    match h.split_once(':') {
+        // 带端口：是管理端端口就换成前台端口，否则说明本来指向别处，保留
+        Some((name, port)) => {
+            if port == ext_port {
+                format!("http://{name}:{port}/")
+            } else {
+                format!("http://{name}:{ext_port}/")
+            }
+        }
+        // 不带端口（经隧道，浏览器默认 80/443）：直接用域名
+        None => format!("http://{h}/"),
+    }
+}
+
+/// 把占位符换成实际地址。
+fn inject_public_url(html: &str, url: &str) -> String {
+    html.replace(PUBLIC_URL_PLACEHOLDER, url)
+}
 
 #[derive(Clone)]
 pub struct Config {
@@ -291,7 +360,7 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
             if session_cookies_ok(state, req.headers()).is_some() {
                 return redirect_to_home();
             }
-            return login_page();
+            return login_page(req.headers());
         }
 
         let cookies = match session_cookies_ok(state, req.headers()) {
@@ -300,7 +369,7 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
         };
 
         let mut resp = if path == "/" {
-            admin_dashboard()
+            admin_dashboard(req.headers())
         } else {
             // 后台域名下不再挂公网静态文件：原来这里直接 read_handler 放行，
             // 等于 /index.html 等路径完全绕过认证（实测无凭据返回 200）。
@@ -870,23 +939,25 @@ fn content_type(path: &Path) -> String {
 // 后台界面
 // ---------------------------------------------------------------------------
 
-/// 后台页面：把 admin.css / admin.js 内联进 admin.html 的占位符。
+/// 后台页面：把 admin.css / admin.js 内联进 admin.html 的占位符，
+/// 并按请求上下文替换「前台」链接。
 ///
 /// 页面引用了 /_admin/admin.css 和 /_admin/admin.js 两个 URL，但那是给
 /// 登录页用的（登录页是独立文件，没法内联）。后台主页为了让 HTML 里
 /// 的占位注释生效，直接在这里替换。
-fn admin_dashboard() -> Response {
+fn admin_dashboard(headers: &HeaderMap) -> Response {
     let html = ADMIN_HTML
         .replacen(CSS_PLACEHOLDER, ADMIN_CSS, 1)
         .replacen(JS_PLACEHOLDER, ADMIN_JS, 1);
-    html_response(html)
+    html_response(inject_public_url(&html, &public_url(headers)))
 }
 
-fn login_page() -> Response {
+fn login_page(headers: &HeaderMap) -> Response {
     // 同样要把公共样式内联进来。
     // 登录页不能引用 /_admin/admin.css —— 那个路径受认证保护，
     // 未登录请求会被跳回登录页本身，浏览器收到 HTML 当 CSS 用，样式就丢了。
-    html_response(LOGIN_HTML.replacen(CSS_PLACEHOLDER, ADMIN_CSS, 1))
+    let html = LOGIN_HTML.replacen(CSS_PLACEHOLDER, ADMIN_CSS, 1);
+    html_response(inject_public_url(&html, &public_url(headers)))
 }
 
 fn html_response(body: String) -> Response {
