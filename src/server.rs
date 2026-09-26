@@ -351,10 +351,38 @@ fn ua_of(req: &Request) -> String {
         .to_string()
 }
 
-fn log_response(state: &AppState, peer: &SocketAddr, method: &str, path: &str, ua: &str, resp: &Response) {
+/// 取访客真实 IP。
+///
+/// 为什么需要：公网流量是经 Cloudflare 隧道进来的，cloudflared 在本机
+/// 反向连到 127.0.0.1:8090，所以 peer 永远是回环地址。
+/// 直接记 peer 的话，2.8 万条日志全是 127.0.0.1，安全监控形同虚设。
+///
+/// 优先取 Cloudflare 的 CF-Connecting-IP（它由边缘写入，客户端伪造不了），
+/// 其次 X-Forwarded-For 的第一段，最后才回落到 peer。
+fn client_ip(headers: &HeaderMap, peer: &SocketAddr) -> String {
+    for name in ["cf-connecting-ip", "true-client-ip", "x-real-ip"] {
+        if let Some(v) = headers.get(name).and_then(|v| v.to_str().ok()) {
+            let v = v.trim();
+            if !v.is_empty() {
+                return v.to_string();
+            }
+        }
+    }
+    if let Some(v) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first) = v.split(',').next() {
+            let first = first.trim();
+            if !first.is_empty() {
+                return first.to_string();
+            }
+        }
+    }
+    peer.ip().to_string()
+}
+
+fn log_response(state: &AppState, ip: &str, method: &str, path: &str, ua: &str, resp: &Response) {
     let status = resp.status().as_u16() as i64;
     let category = classify(ua, status);
-    let _ = state.db.log_request(&peer.ip().to_string(), method, path, status, ua, category);
+    let _ = state.db.log_request(ip, method, path, status, ua, category);
 }
 
 fn classify(ua: &str, status: i64) -> &'static str {
@@ -379,8 +407,10 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
     let method = req.method().to_string();
     let path = req.uri().path().to_string();
     let ua = ua_of(&req);
+    // 在 req 被消费前取出真实访客 IP（经隧道时 peer 是回环，不能直接用）
+    let ip = client_ip(req.headers(), &peer);
     let resp = external_dispatch(&state, &peer, req).await;
-    log_response(&state, &peer, &method, &path, &ua, &resp);
+    log_response(&state, &ip, &method, &path, &ua, &resp);
     resp
 }
 

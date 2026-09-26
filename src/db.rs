@@ -291,6 +291,67 @@ fn log_from_row(row: &Row) -> rusqlite::Result<LogRow> {
     })
 }
 
+/// 来源分类：本机 / 局域网 / 公网。
+///
+/// 为什么要分：公网流量经 Cloudflare 隧道进来时，服务端看到的 peer 一律是
+/// 127.0.0.1；如果连真实访客 IP 都拿不到（见 server.rs 的 CF-Connecting-IP
+/// 处理），统计里就全是本机噪音，看不出真实访问。
+/// 后台默认只展示「公网」来源，本机和局域网默认隐藏。
+pub fn scope_of(ip: &str) -> &'static str {
+    let s = ip.trim();
+    if s.is_empty() {
+        return "unknown";
+    }
+
+    // IPv6
+    if s.contains(':') {
+        let low = s.to_ascii_lowercase();
+        if low == "::1" {
+            return "local";
+        }
+        // IPv4-mapped：::ffff:192.168.1.5
+        if let Some(v4) = low.rsplit(':').next() {
+            if v4.contains('.') {
+                return scope_of(v4);
+            }
+        }
+        // fe80::/10 链路本地 与 fc00::/7 唯一本地地址都算内网
+        if low.starts_with("fe80") || low.starts_with("fc") || low.starts_with("fd") {
+            return "lan";
+        }
+        return "public";
+    }
+
+    // IPv4
+    let mut it = s.split('.');
+    let a: u16 = it.next().and_then(|x| x.parse().ok()).unwrap_or(999);
+    let b: u16 = it.next().and_then(|x| x.parse().ok()).unwrap_or(999);
+    match (a, b) {
+        (127, _) => "local",                          // 回环
+        (10, _) => "lan",                             // 10.0.0.0/8
+        (192, 168) => "lan",                          // 192.168.0.0/16
+        (172, 16..=31) => "lan",                      // 172.16.0.0/12
+        (169, 254) => "lan",                          // 链路本地
+        (0, _) | (255, _) | (999, _) => "unknown",    // 0.0.0.0 / 广播 / 解析失败
+        _ => "public",
+    }
+}
+
+/// 生成 SQLite 里做同样分类的表达式（用于迁移回填）。
+/// 只覆盖到 IPv4；IPv6 在旧数据里没有，遇到就当公网。
+fn scope_sql_expr(col: &str) -> String {
+    format!(
+        "CASE \
+           WHEN {c} LIKE '127.%' OR {c}='::1' THEN 'local' \
+           WHEN {c} LIKE '10.%' OR {c} LIKE '192.168.%' OR {c} LIKE '169.254.%' THEN 'lan' \
+           WHEN {c} LIKE '172.1%' OR {c} LIKE '172.2%' OR {c} LIKE '172.3%' THEN 'lan' \
+           WHEN {c} LIKE 'fe80%' OR {c} LIKE 'fc%' OR {c} LIKE 'fd%' THEN 'lan' \
+           ELSE 'public' \
+         END",
+        c = col
+    )
+}
+
 impl Db {
     pub fn open(path: &Path) -> Result<Self, String> {
         let conn = Connection::open(path).map_err(|e| e.to_string())?;
@@ -317,7 +378,8 @@ impl Db {
                path TEXT NOT NULL,\
                status_code INTEGER NOT NULL,\
                user_agent TEXT NOT NULL,\
-               category TEXT NOT NULL\
+               category TEXT NOT NULL,\
+               scope TEXT NOT NULL DEFAULT 'unknown'\
              );\
              CREATE TABLE IF NOT EXISTS sessions (\
                token TEXT PRIMARY KEY,\
@@ -326,6 +388,39 @@ impl Db {
              );",
         )
         .map_err(|e| e.to_string())?;
+
+        // ---- 迁移：给旧库补 scope 列 ----
+        //
+        // 老库里没有 scope 列（那时也不区分来源），这里补上并回填。
+        // 为什么要来源分类：公网流量经 Cloudflare 隧道进来，peer 一律是
+        // 127.0.0.1，所以旧数据 2.8 万条全是回环；统计和日志被本机/局域网
+        // 的请求淹没，看不到真实访客。加了 scope 之后默认只显示公网来源。
+        let has_scope: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('request_logs') WHERE name='scope'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if has_scope == 0 {
+            // 默认值故意用 'unknown' 而不是 'public'：
+            // 用 'public' 的话回填条件（scope='public'）会把新插入的行
+            // 反复当成待回填，白跑一遍 UPDATE；'unknown' 是个明确的哨兵值。
+            let _ = conn.execute(
+                "ALTER TABLE request_logs ADD COLUMN scope TEXT NOT NULL DEFAULT 'unknown'",
+                [],
+            );
+        }
+        // 回填还没分类的行
+        let _ = conn.execute(
+            &format!(
+                "UPDATE request_logs SET scope = {} \
+                 WHERE scope IS NULL OR scope = '' OR scope = 'unknown'",
+                scope_sql_expr("ip")
+            ),
+            [],
+        );
+
         Ok(Db {
             conn: Mutex::new(conn),
             path: path.to_path_buf(),
@@ -620,8 +715,9 @@ impl Db {
     pub fn log_request(&self, ip: &str, method: &str, path: &str, status_code: i64, user_agent: &str, category: &str) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO request_logs(timestamp,ip,method,path,status_code,user_agent,category) VALUES(datetime('now'),?1,?2,?3,?4,?5,?6)",
-            params![ip, method, path, status_code, user_agent, category],
+            "INSERT INTO request_logs(timestamp,ip,method,path,status_code,user_agent,category,scope) \
+             VALUES(datetime('now'),?1,?2,?3,?4,?5,?6,?7)",
+            params![ip, method, path, status_code, user_agent, category, scope_of(ip)],
         )
         .map_err(|e| e.to_string())?;
         Ok(())
@@ -629,7 +725,9 @@ impl Db {
 
     pub fn query_logs(&self, page: i64, per_page: i64, category: &str, ip: &str, method: &str) -> (Vec<LogRow>, i64) {
         let conn = self.conn.lock().unwrap();
-        let mut where_sql = String::new();
+        // 默认只看公网来源。本机（127.x）和局域网（192.168.x 等）的请求
+        // 是开发调试产生的，混在里面会把真实访客的痕迹淹掉。
+        let mut where_sql = String::from(" AND scope='public'");
         let mut where_vals: Vec<Value> = Vec::new();
         let mut n = 1;
         if !category.is_empty() {
@@ -652,6 +750,8 @@ impl Db {
         let mut data_vals = where_vals;
         data_vals.push(Value::Integer(per_page));
         data_vals.push(Value::Integer((page - 1) * per_page));
+        // 注意：这里的数据查询 WHERE 里已经没有占位符了（scope 条件是字面量），
+        // 所以 LIMIT/OFFSET 的参数序号从 n 开始，不是 n+1。
         let data_sql = format!(
             "SELECT id,timestamp,ip,method,path,status_code,user_agent,category FROM request_logs WHERE 1=1{where_sql} ORDER BY id DESC LIMIT ?{n} OFFSET ?{}",
             n + 1
@@ -667,15 +767,24 @@ impl Db {
         (out, total)
     }
 
+    /// 今日请求数（只统计公网来源）。
     pub fn today_total(&self) -> i64 {
         let conn = self.conn.lock().unwrap();
-        conn.query_row("SELECT COUNT(*) FROM request_logs WHERE date(timestamp)=date('now')", [], |r| r.get(0)).unwrap_or(0)
+        conn.query_row(
+            "SELECT COUNT(*) FROM request_logs WHERE date(timestamp)=date('now') AND scope='public'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0)
     }
 
+    /// 各类别计数（只统计公网来源）。
     pub fn category_counts(&self) -> Vec<(String, i64)> {
         let conn = self.conn.lock().unwrap();
         let mut out = Vec::new();
-        if let Ok(mut stmt) = conn.prepare("SELECT category, COUNT(*) FROM request_logs GROUP BY category ORDER BY COUNT(*) DESC") {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT category, COUNT(*) FROM request_logs WHERE scope='public' GROUP BY category ORDER BY COUNT(*) DESC",
+        ) {
             if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))) {
                 for r in rows.flatten() {
                     out.push(r);
@@ -688,7 +797,9 @@ impl Db {
     pub fn peak_malicious_hour(&self) -> Option<(String, i64)> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT strftime('%H',timestamp) h, COUNT(*) c FROM request_logs WHERE category IN ('scan','crawler','blocked','bruteforce') GROUP BY h ORDER BY c DESC LIMIT 1",
+            "SELECT strftime('%H',timestamp) h, COUNT(*) c FROM request_logs \
+             WHERE category IN ('scan','crawler','blocked','bruteforce') AND scope='public' \
+             GROUP BY h ORDER BY c DESC LIMIT 1",
             [],
             |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)),
         )
@@ -698,7 +809,10 @@ impl Db {
     pub fn hourly_distribution(&self) -> Vec<(String, i64)> {
         let conn = self.conn.lock().unwrap();
         let mut out = Vec::new();
-        if let Ok(mut stmt) = conn.prepare("SELECT strftime('%H',timestamp) h, COUNT(*) c FROM request_logs GROUP BY h ORDER BY h") {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT strftime('%H',timestamp) h, COUNT(*) c FROM request_logs \
+             WHERE scope='public' GROUP BY h ORDER BY h",
+        ) {
             if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))) {
                 for r in rows.flatten() {
                     out.push(r);
@@ -711,7 +825,10 @@ impl Db {
     pub fn daily_distribution(&self) -> Vec<(String, i64)> {
         let conn = self.conn.lock().unwrap();
         let mut out = Vec::new();
-        if let Ok(mut stmt) = conn.prepare("SELECT date(timestamp) d, COUNT(*) c FROM request_logs GROUP BY d ORDER BY d") {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT date(timestamp) d, COUNT(*) c FROM request_logs \
+             WHERE scope='public' GROUP BY d ORDER BY d",
+        ) {
             if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))) {
                 for r in rows.flatten() {
                     out.push(r);

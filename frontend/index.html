@@ -1264,17 +1264,21 @@ body.reading.dark {
     url("/assets/banner.jpg") !important;
 }
 
-/* 亮色：叠层换成浅色蒙版，整体提亮 —— 这样切到亮色能明显看出来 */
+/* 亮色：叠层换成中性灰蒙版，整体压暗一档 ——
+   原来的 rgba(240,244,252,.80) ~ rgba(236,241,249,.92) 太白，
+   满屏浅色配白色卡片会晃眼，长时间看很累。
+   这里取向：偏灰的浅底 + 略降的不透明度，让背景图透一点出来，
+   同时卡片不再是纯白而是带一点冷灰。 */
 body.home-bg:not(.dark) {
-  background-color: #eef2f8 !important;
+  background-color: #e6eaf1 !important;
   background-image:
-    linear-gradient(180deg, rgba(240,244,252,.80) 0%, rgba(238,242,250,.86) 45%, rgba(236,241,249,.92) 100%),
+    linear-gradient(180deg, rgba(228,233,242,.84) 0%, rgba(225,231,241,.88) 45%, rgba(222,229,240,.92) 100%),
     url("/assets/banner.jpg") !important;
 }
 body.reading:not(.dark) {
-  background-color: #f2f5fa !important;
+  background-color: #e8ecf2 !important;
   background-image:
-    linear-gradient(180deg, rgba(244,247,252,.90) 0%, rgba(242,245,251,.94) 40%, rgba(240,244,250,.96) 100%),
+    linear-gradient(180deg, rgba(232,236,244,.92) 0%, rgba(229,234,242,.94) 40%, rgba(226,232,241,.96) 100%),
     url("/assets/banner.jpg") !important;
 }
 /* 关掉极光那层的噪点，避免和背景图打架 */
@@ -1282,8 +1286,8 @@ body.home-bg::before,
 body.reading::before { display: none !important; }
 
 /* ---------- 亮色主题下的卡片文字色 ----------
-   卡片底色偏深是深色主题的设计；亮色下要整体换成浅底深字，
-   否则会出现「浅背景 + 半透明深卡 + 深字」这种看不清的组合。 */
+   卡片不再用纯白：满屏浅底 + 纯白卡片反差过大，看久了晃眼。
+   改成带一点冷灰的浅色，文字用 slate 系而不是近黑。 */
 body.home-bg:not(.dark) .hero-card,
 body.home-bg:not(.dark) .side-card,
 body.home-bg:not(.dark) .home-grid .home-item,
@@ -1292,65 +1296,109 @@ body.reading:not(.dark) #r-body,
 body.reading:not(.dark) .toc,
 body.reading:not(.dark) .reader-foot,
 body.reading:not(.dark) .r-related {
-  background: rgba(255,255,255,.78) !important;
-  border-color: rgba(15,23,42,.10) !important;
-  box-shadow: 0 12px 36px rgba(30,41,59,.14) !important;
+  background: rgba(247, 249, 252, .82) !important;
+  border-color: rgba(15,23,42,.09) !important;
+  box-shadow: 0 6px 22px rgba(30,41,59,.10) !important;
 }
 body.home-bg:not(.dark) .hc-title,
-body.home-bg:not(.dark) .hc-tag,
-body.home-bg:not(.dark) .pc-name { color: #0f172a !important; }
+body.home-bg:not(.dark) .pc-name { color: #1a2332 !important; }
+body.home-bg:not(.dark) .hc-tag { color: #1d4ed8 !important; }
 body.home-bg:not(.dark) .hc-desc,
 body.home-bg:not(.dark) .pc-bio,
 body.home-bg:not(.dark) .sc-title,
 body.home-bg:not(.dark) .sc-links a,
 body.home-bg:not(.dark) .home-grid .home-item .hi-title,
-body.home-bg:not(.dark) .home-grid .home-item .hi-excerpt { color: #1e293b !important; }
+body.home-bg:not(.dark) .home-grid .home-item .hi-excerpt { color: #33415a !important; }
 body.home-bg:not(.dark) .hc-meta,
 body.home-bg:not(.dark) .pc-sub,
 body.home-bg:not(.dark) .sc-date,
 body.home-bg:not(.dark) .sc-head,
 body.home-bg:not(.dark) .sec-head,
-body.home-bg:not(.dark) .home-grid .home-item .hi-meta { color: rgba(30,41,59,.55) !important; }
+body.home-bg:not(.dark) .home-grid .home-item .hi-meta { color: rgba(40,54,78,.55) !important; }
 body.home-bg:not(.dark) .hc-tag {
-  background: rgba(37,99,235,.10) !important;
-  border-color: rgba(37,99,235,.22) !important;
-  color: #1d4ed8 !important;
+  background: rgba(37,99,235,.09) !important;
+  border-color: rgba(37,99,235,.20) !important;
 }
 body.home-bg:not(.dark) .pc-tag,
 body.home-bg:not(.dark) .home-grid .home-item .p-tag {
-  background: rgba(15,23,42,.06) !important;
-  border-color: rgba(15,23,42,.10) !important;
-  color: rgba(30,41,59,.7) !important;
+  background: rgba(15,23,42,.05) !important;
+  border-color: rgba(15,23,42,.09) !important;
+  color: rgba(40,54,78,.72) !important;
 }
-body.home-bg:not(.dark) .hc-meta { border-top-color: rgba(15,23,42,.10) !important; }
+body.home-bg:not(.dark) .hc-meta { border-top-color: rgba(15,23,42,.09) !important; }
 body.home-bg:not(.dark) .sc-item,
-body.home-bg:not(.dark) .sc-links a { border-top-color: rgba(15,23,42,.08) !important; }
+body.home-bg:not(.dark) .sc-links a { border-top-color: rgba(15,23,42,.07) !important; }
 body.home-bg:not(.dark) .sec-head::after {
-  background: linear-gradient(90deg, rgba(15,23,42,.14), transparent) !important;
+  background: linear-gradient(90deg, rgba(15,23,42,.12), transparent) !important;
 }
 body.home-bg:not(.dark) .home-more .pager {
-  background: rgba(255,255,255,.72) !important;
-  border-color: rgba(15,23,42,.10) !important;
+  background: rgba(247,249,252,.78) !important;
+  border-color: rgba(15,23,42,.09) !important;
 }
 body.home-bg:not(.dark) .home-more .pager .pg-btn,
 body.home-bg:not(.dark) .home-more .pager .pg-input {
-  background: rgba(15,23,42,.05) !important;
-  border-color: rgba(15,23,42,.12) !important;
-  color: #1e293b !important;
+  background: rgba(15,23,42,.04) !important;
+  border-color: rgba(15,23,42,.10) !important;
+  color: #33415a !important;
 }
-body.reading:not(.dark) .md-body { color: #1e293b !important; }
+body.reading:not(.dark) .md-body { color: #2b3850 !important; }
 body.reading:not(.dark) .md-body h1,
 body.reading:not(.dark) .md-body h2,
 body.reading:not(.dark) .md-body h3,
-body.reading:not(.dark) .md-body h4 { color: #0f172a !important; }
+body.reading:not(.dark) .md-body h4 { color: #1a2332 !important; }
 body.reading:not(.dark) .md-body a { color: #2563eb !important; }
 body.reading:not(.dark) .md-body pre {
-  background: rgba(15,23,42,.05) !important;
-  border-color: rgba(15,23,42,.10) !important;
+  background: rgba(15,23,42,.04) !important;
+  border-color: rgba(15,23,42,.09) !important;
 }
 body.reading:not(.dark) .md-body :not(pre) > code {
-  background: rgba(15,23,42,.06) !important;
+  background: rgba(15,23,42,.05) !important;
   color: #2563eb !important;
+}
+
+/* 亮色下的顶栏：深色胶囊在浅背景上太跳，换成浅玻璃 */
+body:not(.dark) #topbar,
+body:not(.dark) .menubar,
+body:not(.dark) .taskbar,
+body:not(.dark) .top-bar,
+body:not(.dark) #taskbar,
+body:not(.dark) #menubar {
+  background: rgba(250, 251, 253, .72) !important;
+  border-color: rgba(15,23,42,.09) !important;
+  box-shadow: 0 6px 24px rgba(30,41,59,.12), inset 0 1px 0 rgba(255,255,255,.6) !important;
+}
+body:not(.dark) #topbar.scrolled,
+body:not(.dark) .menubar.scrolled,
+body:not(.dark) .taskbar.scrolled,
+body:not(.dark) .top-bar.scrolled,
+body:not(.dark) #taskbar.scrolled,
+body:not(.dark) #menubar.scrolled {
+  background: rgba(250, 251, 253, .88) !important;
+  box-shadow: 0 10px 32px rgba(30,41,59,.16) !important;
+}
+body:not(.dark) #tb-tabs button { color: rgba(40,54,78,.68) !important; }
+body:not(.dark) #tb-tabs button:hover { color: #1a2332 !important; background: rgba(15,23,42,.05) !important; }
+body:not(.dark) #tb-tabs button.on { color: #1a2332 !important; background: rgba(15,23,42,.08) !important; }
+body:not(.dark) #tb-brand b,
+body:not(.dark) #tb-brand .brand-text { color: #1a2332 !important; }
+body:not(.dark) #tb-brand span { color: rgba(40,54,78,.55) !important; }
+body:not(.dark) .icon-btn,
+body:not(.dark) .tb-menu {
+  background: rgba(15,23,42,.05) !important;
+  border-color: rgba(15,23,42,.10) !important;
+  color: #33415a !important;
+}
+body:not(.dark) .icon-btn:hover,
+body:not(.dark) .tb-menu:hover { background: rgba(15,23,42,.10) !important; color: #1a2332 !important; }
+body:not(.dark) .tb-admin {
+  background: rgba(37,99,235,.10) !important;
+  border-color: rgba(37,99,235,.30) !important;
+  color: #1d4ed8 !important;
+}
+body:not(.dark) .tb-admin:hover {
+  background: rgba(37,99,235,.18) !important;
+  border-color: rgba(37,99,235,.45) !important;
+  color: #1e40af !important;
 }
 
 /* 题目要求的背景层 */
