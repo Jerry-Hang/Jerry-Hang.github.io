@@ -404,6 +404,8 @@ function showView(name) {
     if (v) v.classList.add("on");
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   document.body.classList.toggle("reading", name === "reader");
+  // 首页用固定大图背景，其他视图回到极光底
+  document.body.classList.toggle("home-bg", name === "home");
   state.nav = name;
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
@@ -435,19 +437,91 @@ function selectArticle(idx) {
 
 /* ---------- 主页文章长条 3/4 + 翻页 ---------- */
 function renderHome() {
-  const grid = document.getElementById("pin-grid");
   const list = state.posts;
+  const grid = document.getElementById("pin-grid");
+
+  if (!list.length) {
+    const hc = document.getElementById("hero-card");
+    if (hc) hc.innerHTML = '<div class="hc-body"><h2 class="hc-title">还没有文章</h2>' +
+      '<p class="hc-desc">运行 blog_ctl new 创建第一篇。</p></div>';
+    if (grid) grid.innerHTML = '<div class="empty-tip">暂无文章</div>';
+    const pager0 = document.getElementById("pager-home");
+    if (pager0) pager0.innerHTML = "";
+    return;
+  }
+
+  /* ---------- 右栏：作者卡片 + 最新更新 + 站内链接 ---------- */
+
+  // 简介：从「关于」类文章里取，取不到就用站点默认
+  const aboutPost = list.find(p => (p.categories || []).some(c => c === "自述" || c === "关于")) || list[0];
+  const bioEl = document.getElementById("pc-bio");
+  if (bioEl) {
+    bioEl.textContent = (aboutPost && aboutPost.desc)
+      ? aboutPost.desc
+      : "一个用 Rust 命令行工具与原生 HTML/CSS/JS 打造的胶囊目录静态博客。";
+  }
+
+  // 标签胶囊：用文章里出现最多的几个标签
+  const tagCount = {};
+  list.forEach(p => (p.tags || []).forEach(t => { tagCount[t] = (tagCount[t] || 0) + 1; }));
+  const topTags = Object.keys(tagCount).sort((a, b) => tagCount[b] - tagCount[a]).slice(0, 3);
+  const tagBox = document.getElementById("pc-tags");
+  if (tagBox) {
+    tagBox.innerHTML = topTags.map(t => '<span class="pc-tag">' + esc(t) + '</span>').join("");
+  }
+
+  // 最新更新：按日期倒序取 4 篇
+  const latest = list.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 4);
+  const listBox = document.getElementById("latest-list");
+  if (listBox) {
+    listBox.innerHTML = latest.map(p => {
+      const idx = list.indexOf(p);
+      return '<button class="sc-item" data-idx="' + idx + '">' +
+        '<span class="sc-title">' + esc(p.title) + '</span>' +
+        '<span class="sc-date">' + esc(p.date || "") + '</span>' +
+      '</button>';
+    }).join("");
+    $$("#latest-list .sc-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
+  }
+
+  /* ---------- 大卡：置顶优先，否则最新一篇 ---------- */
+  const hero = list.find(p => p.pinned) || latest[0];
+  const heroBox = document.getElementById("hero-card");
+  if (heroBox && hero) {
+    const idx = list.indexOf(hero);
+    const words = (hero.body || "").replace(/\s/g, "").length;
+    const tags = (hero.categories || []).concat(hero.tags || []).slice(0, 4)
+      .map(t => '<span class="hc-tag">' + esc(t) + '</span>').join("");
+    const cover = hero.cover || "/assets/banner.jpg";
+    heroBox.innerHTML =
+      '<img class="hc-cover" src="' + esc(cover) + '" alt="" loading="eager">' +
+      '<div class="hc-body">' +
+        (tags ? '<div class="hc-tags">' + tags + '</div>' : '') +
+        '<h2 class="hc-title">' + esc(hero.title) + '</h2>' +
+        (hero.desc ? '<p class="hc-desc">' + esc(hero.desc) + '</p>' : '') +
+        '<div class="hc-meta">' +
+          '<span>' + esc(hero.date || "") + '</span>' +
+          '<span>' + esc(SITE.author) + '</span>' +
+          '<span>' + words.toLocaleString() + ' 字 · 约 ' + readMinutes(hero) + ' 分钟</span>' +
+          '<span class="hc-read">阅读全文 ›</span>' +
+        '</div>' +
+      '</div>';
+    heroBox.onclick = () => selectArticle(idx);
+  }
+
+  /* ---------- 下方网格：排除大卡那篇，其余分页 ---------- */
+  const rest = list.filter(p => p !== hero);
   const perPage = (window.innerWidth <= 720 ? 4 : 6);
-  const pages = Math.max(1, Math.ceil(list.length / perPage));
+  const pages = Math.max(1, Math.ceil(rest.length / perPage));
   if (state.pinnedPage > pages) state.pinnedPage = pages;
   const start = (state.pinnedPage - 1) * perPage;
-  const pageItems = list.slice(start, start + perPage);
+  const pageItems = rest.slice(start, start + perPage);
 
   if (!pageItems.length) {
-    grid.innerHTML = '<div class="empty-tip">暂无文章，运行 blog_ctl new 创建第一篇。</div>';
+    grid.innerHTML = '<div class="empty-tip">没有更多文章了</div>';
   } else {
     grid.innerHTML = pageItems.map(p => {
-      const idx = state.posts.indexOf(p);
+      const idx = list.indexOf(p);
       const words = (p.body || "").replace(/\s/g, "").length;
       const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
       const cats = (p.categories || []).slice(0, 1).map(c => '<span class="hi-cats">' + esc(c) + '</span>').join("");
@@ -467,24 +541,28 @@ function renderHome() {
   $$("#pin-grid .home-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
   if (window.bindTilt) window.bindTilt(grid);
 
+  /* ---------- 分页 ---------- */
   const pager = document.getElementById("pager-home");
-  pager.innerHTML =
-    '<button class="pg-btn" id="pg-prev" ' + (state.pinnedPage <= 1 ? "disabled" : "") + '>‹ 上一页</button>' +
-    '<span class="pg-info">第 <b>' + state.pinnedPage + '</b> / ' + pages + ' 页</span>' +
-    '<input class="pg-input" id="pg-input" type="number" min="1" max="' + pages + '" value="' + state.pinnedPage + '" aria-label="页码">' +
-    '<button class="pg-btn" id="pg-go">前往</button>' +
-    '<button class="pg-btn" id="pg-next" ' + (state.pinnedPage >= pages ? "disabled" : "") + '>下一页 ›</button>';
-  document.getElementById("pg-prev").addEventListener("click", () => { state.pinnedPage--; renderHome(); });
-  document.getElementById("pg-next").addEventListener("click", () => { state.pinnedPage++; renderHome(); });
-  document.getElementById("pg-go").addEventListener("click", () => {
-    let n = parseInt(document.getElementById("pg-input").value, 10);
-    if (isNaN(n)) return;
-    n = Math.min(pages, Math.max(1, n));
-    state.pinnedPage = n; renderHome();
-  });
-  document.getElementById("pg-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("pg-go").click(); });
+  if (rest.length <= perPage) {
+    pager.innerHTML = "";
+  } else {
+    pager.innerHTML =
+      '<button class="pg-btn" id="pg-prev" ' + (state.pinnedPage <= 1 ? "disabled" : "") + '>‹ 上一页</button>' +
+      '<span class="pg-info">第 <b>' + state.pinnedPage + '</b> / ' + pages + ' 页</span>' +
+      '<input class="pg-input" id="pg-input" type="number" min="1" max="' + pages + '" value="' + state.pinnedPage + '" aria-label="页码">' +
+      '<button class="pg-btn" id="pg-go">前往</button>' +
+      '<button class="pg-btn" id="pg-next" ' + (state.pinnedPage >= pages ? "disabled" : "") + '>下一页 ›</button>';
+    document.getElementById("pg-prev").addEventListener("click", () => { state.pinnedPage--; renderHome(); });
+    document.getElementById("pg-next").addEventListener("click", () => { state.pinnedPage++; renderHome(); });
+    document.getElementById("pg-go").addEventListener("click", () => {
+      let n = parseInt(document.getElementById("pg-input").value, 10);
+      if (isNaN(n)) return;
+      n = Math.min(pages, Math.max(1, n));
+      state.pinnedPage = n; renderHome();
+    });
+    document.getElementById("pg-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("pg-go").click(); });
+  }
 }
-
 /* ---------- 阅读 ---------- */
 function openArticle(idx) {
   const p = state.posts[idx];
