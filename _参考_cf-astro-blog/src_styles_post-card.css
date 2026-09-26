@@ -1,0 +1,346 @@
+.post-card {
+	--glass-panel-opacity: calc(var(--post-card-opacity, 14) / 100);
+	--glass-panel-blur: var(--post-card-blur, 18px);
+	--post-card-blur-effective: min(
+		calc(var(--post-card-blur, 18px) * 1.6),
+		76px
+	);
+	--post-card-surface-alpha: min(
+		calc(var(--post-card-opacity, 14) / 100),
+		0.28
+	);
+	position: relative;
+	display: grid;
+	grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.45fr);
+	gap: clamp(0.5rem, 0.2rem + 0.6vw, 0.8rem);
+	padding: clamp(0.28rem, 0.2rem + 0.35vw, 0.52rem);
+	min-height: clamp(16rem, 24vw, 19rem);
+	overflow: hidden;
+	isolation: isolate;
+	transform: translate3d(0, 0, 0);
+	/*
+	 * ::after 被 hover 闪光动画占用（opacity:0 + left:-28% + 渐变背景），
+	 * global.css .glass-panel::after 的毛玻璃层被完全覆盖导致永远不可见。
+	 * 正确做法：将 backdrop-filter 与 background 直接应用在卡片本身。
+	 *
+	 * saturate/brightness 保持中性，避免对底图做额外染色与压暗。
+	 * 视觉层次由 blur + 半透明背景 + 边框/阴影提供。
+	 */
+	backdrop-filter: blur(var(--post-card-blur-effective)) saturate(100%)
+		brightness(1);
+	-webkit-backdrop-filter: blur(var(--post-card-blur-effective)) saturate(100%)
+		brightness(1);
+	opacity: 0;
+	animation: post-card-settle 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	transition:
+		transform var(--transition),
+		border-color var(--transition),
+		box-shadow var(--transition),
+		background-color var(--transition),
+		backdrop-filter var(--transition);
+}
+
+.post-card-no-cover {
+	grid-template-columns: 1fr;
+	min-height: auto;
+}
+
+.post-card::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -28%;
+	width: 54%;
+	border-radius: inherit;
+	background: linear-gradient(
+		120deg,
+		rgba(var(--card-sheen-rgb), 0) 22%,
+		rgba(var(--card-sheen-rgb), 0.16) 50%,
+		rgba(var(--card-sheen-rgb), 0) 76%
+	);
+	/* 显式禁用来自 global.css .glass-panel::after 的 backdrop-filter，
+	 * 防止 hover 闪光动画在变为可见时产生意外的卡片内部模糊 */
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+	opacity: 0;
+	transform: translate3d(-120%, 0, 0);
+	transition:
+		opacity 280ms ease,
+		transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.post-card-cover {
+	position: relative;
+	display: block;
+	overflow: hidden;
+	min-height: 100%;
+	border-radius: calc(var(--radius-panel) - 8px);
+	background:
+		linear-gradient(
+			145deg,
+			rgba(var(--card-sheen-rgb), 0.22),
+			rgba(var(--card-sheen-rgb), 0.08)
+		),
+		radial-gradient(
+			circle at 24% 22%,
+			rgba(10, 132, 255, 0.28),
+			transparent 58%
+		);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.35),
+		0 16px 30px -30px rgba(8, 18, 34, 0.5);
+	z-index: 1;
+}
+
+.post-card-cover::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(
+		180deg,
+		rgba(8, 18, 34, 0.1) 0%,
+		rgba(8, 18, 34, 0.04) 46%,
+		rgba(8, 18, 34, 0.14) 100%
+	);
+	z-index: 1;
+}
+
+.post-card-cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+	transform: scale(1);
+	transition:
+		transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+		filter 320ms ease;
+}
+
+.post-card-content {
+	position: relative;
+	z-index: 2;
+	display: grid;
+	align-content: start;
+	gap: var(--space-md);
+	padding: clamp(0.84rem, 0.58rem + 0.7vw, 1.3rem)
+		clamp(0.92rem, 0.72rem + 0.8vw, 1.35rem)
+		clamp(1rem, 0.72rem + 0.9vw, 1.44rem);
+}
+
+.post-card-top {
+	display: grid;
+	gap: var(--space-sm);
+}
+
+.pill-row,
+.post-card-title,
+.post-card-excerpt,
+.post-card-meta,
+.post-card-readmore {
+	transition:
+		transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+		color 220ms ease,
+		letter-spacing 220ms ease,
+		opacity 220ms ease;
+}
+
+.post-card-link {
+	display: block;
+	width: 100%;
+	color: inherit;
+}
+
+.post-card-title {
+	font-size: clamp(1.25rem, 1.14rem + 0.5vw, 1.68rem);
+	color: var(--color-text);
+	line-height: 1.15;
+	letter-spacing: -0.03em;
+	overflow-wrap: anywhere;
+}
+
+.post-card-link:hover .post-card-title {
+	color: var(--color-accent-hover);
+}
+
+.post-card:hover .post-card-title {
+	color: var(--color-accent-hover);
+}
+
+.post-card-excerpt {
+	color: var(--color-text-secondary);
+	font-size: 0.96rem;
+	line-height: 1.82;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.post-card:hover .post-card-excerpt {
+	color: var(--color-text);
+}
+
+.post-card-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+	font-size: 0.88rem;
+	color: var(--color-text-secondary);
+}
+
+.post-card-readmore {
+	color: var(--color-accent);
+	font-weight: 600;
+}
+
+.post-card-cover-left .post-card-cover {
+	-webkit-clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%);
+	clip-path: polygon(0 0, 90% 0, 100% 100%, 0 100%);
+}
+
+.post-card-cover-right {
+	grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.95fr);
+}
+
+.post-card-cover-right .post-card-content {
+	order: 1;
+}
+
+.post-card-no-cover .post-card-content {
+	order: 1;
+}
+
+.post-card-cover-right .post-card-cover {
+	order: 2;
+	-webkit-clip-path: polygon(0 0, 100% 0, 100% 100%, 10% 100%);
+	clip-path: polygon(0 0, 100% 0, 100% 100%, 10% 100%);
+}
+
+.post-card-cover-right .post-card-cover img {
+	transform-origin: right center;
+	transform: scale(1);
+}
+
+.post-card:hover {
+	transform: translate3d(0, -5px, 0);
+	border-color: rgba(10, 132, 255, 0.14);
+	box-shadow:
+		0 22px 38px -34px rgba(8, 18, 34, 0.22),
+		0 8px 18px -16px rgba(8, 18, 34, 0.16);
+}
+
+.post-card:hover::after {
+	opacity: 1;
+	transform: translate3d(280%, 0, 0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.post-card:hover {
+		transform: translate3d(0, -8px, 0);
+		border-color: rgba(10, 132, 255, 0.18);
+		box-shadow:
+			0 30px 48px -34px rgba(8, 18, 34, 0.26),
+			0 10px 24px -18px rgba(8, 18, 34, 0.18);
+	}
+}
+
+@keyframes post-card-settle {
+	from {
+		opacity: 0;
+		filter: blur(10px);
+	}
+
+	to {
+		opacity: 1;
+		filter: blur(0);
+	}
+}
+
+@media (max-width: 900px) {
+	.post-card,
+	.post-card-cover-right {
+		grid-template-columns: 1fr;
+		min-height: auto;
+	}
+
+	.post-card-cover,
+	.post-card-cover-right .post-card-cover {
+		order: 1;
+		min-height: clamp(11rem, 35vw, 14rem);
+		-webkit-clip-path: none;
+		clip-path: none;
+	}
+
+	.post-card-cover-right .post-card-cover img,
+	.post-card-cover-right:hover .post-card-cover img {
+		transform-origin: center;
+		transform: scale(1);
+	}
+
+	.post-card-content,
+	.post-card-cover-right .post-card-content {
+		order: 2;
+	}
+}
+
+@media (max-width: 640px) {
+	.post-card-meta {
+		flex-wrap: wrap;
+	}
+}
+
+@media (hover: none), (pointer: coarse) {
+	.post-card-cover-left .post-card-cover,
+	.post-card-cover-right .post-card-cover {
+		-webkit-clip-path: none;
+		clip-path: none;
+		border-radius: calc(var(--radius-panel) - 8px);
+	}
+
+	.post-card:hover {
+		transform: none;
+		box-shadow: var(--shadow-card);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.post-card,
+	.post-card::after,
+	.post-card-cover img,
+	.pill-row,
+	.post-card-title,
+	.post-card-excerpt,
+	.post-card-meta,
+	.post-card-readmore {
+		animation: none;
+		transition: none;
+		transform: none;
+		opacity: 1;
+	}
+}
+
+/*
+ * 双类选择器（特异性 0-2-0）覆盖 global.css .glass-panel { background: transparent }（0-1-0），
+ * 确保 PostCard 的半透明背景不被更低特异性的 glass-panel 规则重置。
+ */
+.post-card.glass-panel {
+	background: rgba(
+		var(--card-surface-rgb),
+		calc(var(--post-card-opacity, 14) / 100)
+	);
+}
+
+/*
+ * 双类选择器（特异性 0-2-1）覆盖 global.css .glass-panel::after { backdrop-filter: blur(...) }（0-1-1）。
+ * ::after 专用于 hover 闪光动画，不需要 backdrop-filter，
+ * 否则 hover 时会对卡片内容产生意外模糊。
+ */
+.post-card.glass-panel::after {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}

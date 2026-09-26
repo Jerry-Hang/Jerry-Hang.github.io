@@ -58,6 +58,8 @@ function applyWall() {
   }
   const el = document.getElementById("wallpaper");
   if (el) el.style.backgroundImage = w.img ? "url('" + w.img + "')" : "none";
+  // 有壁纸图时给 body 加标记，让极光那层 !important 渐变让位（见 index.html 的说明）
+  document.body.classList.toggle("has-wall", !!w.img);
   localStorage.setItem("jb_wall2", state.wall);
 }
 

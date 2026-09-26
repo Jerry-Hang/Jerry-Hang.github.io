@@ -684,9 +684,25 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
   .pg-info { font-size: 11.5px; }
 }
 
-/* Force aurora to be the desktop background (hide SPA floral wallpaper) */
-#wallpaper{background-image:none;}
+/* 壁纸层与极光背景的关系
+   ------------------------------------------------------------------
+   页面背景由两层叠成：
+     body          —— 底下的颜色/极光渐变（aurora-frost 里用 !important 写死）
+     #wallpaper    —— 壁纸层，z-index 更低但盖在 body 背景之上
+   app.js 的 applyWall() 用内联样式给 #wallpaper 设 backgroundImage。
+
+   原来这里有一行 `#wallpaper{background-image:none;}`，
+   把壁纸整个禁用了（改用极光当桌面背景），结果壁纸选择器点了没反应。
+   现在恢复壁纸可用：选了带图的壁纸时给 body 加 .has-wall，
+   让极光那层 !important 的渐变全透明，壁纸才露得出来。
+   选「纯色」时没有 .has-wall，仍然显示极光。 */
 #wall-shade{background:transparent !important;}
+
+body.has-wall,
+body.has-wall:not(.dark){
+  background:transparent !important;
+  background-image:none !important;
+}
 
 /* Mobile: compact topbar + admin link in flow */
 #topbar{flex-wrap:nowrap;gap:6px;padding-right:10px}
@@ -857,5 +873,5 @@ body:not(.dark) .menubar.scrolled,body:not(.dark) .taskbar.scrolled,body:not(.da
 </style>
 <script>
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
-</script><script>(function(){var tb=document.getElementById("topbar");if(tb){var a=document.createElement("a");a.href="http://127.0.0.1:8081/";a.className="tb-admin";a.textContent="查看后台";tb.appendChild(a);}})();</script><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script></body>
+</script><script>(function(){var tb=document.getElementById("topbar");if(tb){var a=document.createElement("a");a.href="http://127.0.0.1:8091/";a.className="tb-admin";a.textContent="查看后台";tb.appendChild(a);}})();</script><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script></body>
 </html>
