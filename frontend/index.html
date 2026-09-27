@@ -2171,6 +2171,164 @@ body.reading #r-body { border-radius: var(--r-lg) !important; }
   .tb-admin { padding: 0 10px !important; font-size: var(--fs-sm) !important; }
   :root { --ctl-md: 30px; --ctl-lg: 36px; }
 }
+
+/* ==========================================================================
+   顶栏收尾：让「外框」真的包住「横条」，并修掉收缩后的排版塌陷
+   --------------------------------------------------------------------------
+   实测（1440 视口，滚动进入 compact 后）暴露三个问题：
+
+   1) 上下不齐 —— .top-area 只有 margin: 6px auto 0（没有下边距、没有内边距），
+      而 #topbar 的 height:56px !important 又压过了
+      `.top-area.compact #topbar{height:30px}`，于是横条被顶在上沿：
+          上间距 12px，下间距 1px   ← 看起来「贴着底边、不居中」
+      外框也没有内边距，横条左右被 flex 缩到 244px，
+          左右间距 28px 而外框只有 300px，横条自己只剩 244px 可用。
+
+   2) 标题被硬截断 ——
+          #tb-brand .brand-text{max-width:110px}      （第 774 行）
+          @media(max-width:520px){max-width:84px}     （第 779 行）
+      「JerryHang 的个人博客」实测要 147px，被砍到 110px，
+      于是只显示「JerryHang 的个人」。
+
+   3) 收缩后导航消失 —— `.top-area.compact #tb-tabs{opacity:0}`，
+      三个主导航项在滚动后直接不可见（实测 nav: opacity0）。
+
+   这一块放在最后，用同等权重覆盖前面几处互相冲突的旧规则。
+   ========================================================================== */
+
+/* ---------- 外框：一条完整的浮动胶囊，真正把横条包在中间 ---------- */
+.top-area,
+.top-area.compact {
+  /* 浮动胶囊要有「岛」的感觉：不能几乎占满视口，
+     否则和原来那条贴边直条没区别（实测 1440 下宽到 1360px）。 */
+  width: min(94vw, 1240px) !important;
+  margin: 10px auto 0 !important;
+  /* 上下左右都留出内边距，横条才会居中；下边距不能是 0 */
+  padding: 7px !important;
+  border-radius: 999px !important;
+  border-bottom-color: transparent !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 10px 34px rgba(0,0,0,.30) !important;
+  transition: width .3s cubic-bezier(.25,.8,.25,1), margin .3s cubic-bezier(.25,.8,.25,1),
+              padding .3s cubic-bezier(.25,.8,.25,1), border-radius .3s ease !important;
+}
+
+/* ---------- 内横条：高度自适应，去掉会和 .compact 打架的固定高度 ---------- */
+#topbar,
+.top-area #topbar {
+  /* 关键：不能写 min-height:0 —— 那会把几何规范里的 min-height:56px 一起干掉，
+     横条就塌成图标的自然高度（实测 34px），外框也跟着变扁。 */
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0 clamp(12px, 1.5vw, 18px) !important;
+  /* 第 1769 行的 `margin: 12px clamp(10px,2.2vw,28px) 0 !important` 还在生效，
+     而 margin-left/right 是它的长属性 —— 只写 margin-top 覆盖不掉。
+     实测横条左右各被推了 28px，右边缘直接溢出外框 23px。
+     这里用 margin:0 清掉全套，间距只由 .top-area 的 padding 决定。 */
+  margin: 0 !important;
+  /* 外框已经画了圆角与阴影，内层同值圆角即可贴合 */
+  border-radius: 999px !important;
+  /* 外层有阴影，内层只保留一道高光，避免双重投影发脏 */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07) !important;
+}
+/* 外壳收起时略矮一点，但仍然是有分量的一条 */
+.top-area.compact #topbar { height: 50px !important; min-height: 50px !important; max-height: 50px !important; }
+
+/* ---------- 收缩态：外框变窄但仍装得下全部内容，导航不消失 ---------- */
+.top-area.compact {
+  width: min(92vw, 680px) !important;
+  padding: 6px !important;
+}
+.top-area.compact #tb-tabs {
+  max-height: none !important;
+  opacity: 1 !important;
+  gap: 2px !important;
+  flex: 0 0 auto !important;
+}
+
+/* ---------- 品牌：允许完整显示，不再用 max-width 硬切 ---------- */
+#tb-brand {
+  gap: 9px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+#tb-brand .brand-text {
+  max-width: none !important;      /* 三处 max-width 全部作废 */
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+#tb-brand b { white-space: nowrap !important; }
+/* 副标题「记录与折腾」在窄屏让位给主标题，避免两个都挤 */
+@media (max-width: 900px) { #tb-brand span { display: none !important; } }
+
+/* ---------- 导航与图标：永不压缩、永不被推到中间 ---------- */
+#tb-tabs {
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  overflow: visible !important;
+}
+/* 侧栏展开时导航靠左，和 24px 间距的旧规则保持一致 */
+@media (min-width: 1000px) {
+  #tb-tabs { margin-left: 24px !important; margin-right: auto !important; }
+}
+#tb-tabs button { flex: 0 0 auto !important; white-space: nowrap !important; }
+#tb-theme, .tb-menu, .tb-admin { flex: 0 0 auto !important; }
+
+/* ---------- 两层配色：让「框」和「条」真的能区分开 ----------
+   实测两者原本是 rgba(28,28,30,.72) 与 rgba(12,17,30,.52) —— 色调几乎一样，
+   嵌套关系完全看不出来，只剩外框一圈细边，观感就成了「一条贴边的黑条」。
+   这里把外框提亮、内条压深，并补一圈细描边，层次才立得住。 */
+.top-area,
+.top-area.compact {
+  background: rgba(236, 240, 248, .88) !important;
+}
+body.dark .top-area,
+body.dark .top-area.compact {
+  background: rgba(124, 136, 165, .30) !important;
+  border: 1px solid rgba(255, 255, 255, .16) !important;
+  border-bottom-color: transparent !important;
+}
+#topbar,
+.top-area #topbar {
+  background: rgba(12, 17, 30, .94) !important;
+  border: 1px solid rgba(255, 255, 255, .10) !important;
+}
+body:not(.dark) #topbar,
+body:not(.dark) .top-area #topbar {
+  background: rgba(22, 28, 44, .94) !important;
+}
+
+/* ---------- 窄屏：外框贴近边缘，内边距收一点 ---------- */
+@media (max-width: 720px) {
+  .top-area,
+  .top-area.compact { width: calc(100vw - 16px) !important; margin-top: 8px !important; }
+}
+
+/* ---------- 小屏：优先保证标题可读，导航和按钮一起收紧 ----------
+   实测 400px 视口下，导航(3×44) + 主题(30) + 汉堡(30) + 查看后台(84)
+   一共吃掉约 280px，标题只剩 18px —— 等于看不见。
+   这里把导航按钮压到最小可点尺寸，并保证标题至少有 70px。 */
+@media (max-width: 560px) {
+  #tb-tabs button { padding: 0 7px !important; font-size: 11.5px !important; }
+  #tb-tabs { gap: 0 !important; margin-left: 6px !important; }
+  .tb-admin { padding: 0 8px !important; font-size: 11.5px !important; }
+  :root { --ctl-md: 28px; --ctl-lg: 32px; }
+  #topbar { padding: 0 8px !important; gap: 4px !important; }
+  #tb-brand { gap: 6px !important; }
+  #tb-brand b { font-size: 13px !important; }
+}
+@media (max-width: 420px) {
+  /* 再挤就舍掉「查看后台」——它需要 SSH 隧道才用得上，手机上不是主路径 */
+  .tb-admin { display: none !important; }
+  #tb-brand .brand-text { min-width: 76px !important; }
+}
 </style>
 <script>
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
