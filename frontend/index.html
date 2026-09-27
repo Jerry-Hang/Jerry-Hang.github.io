@@ -2325,9 +2325,17 @@ body:not(.dark) .top-area #topbar {
   #tb-brand b { font-size: 13px !important; }
 }
 @media (max-width: 420px) {
-  /* 再挤就舍掉「查看后台」——它需要 SSH 隧道才用得上，手机上不是主路径 */
-  .tb-admin { display: none !important; }
-  #tb-brand .brand-text { min-width: 76px !important; }
+  /* 注意：这里**不能**隐藏「查看后台」。
+     之前写成 .tb-admin{display:none} 是错的 —— 实测 380px 下
+     横条 scrollWidth == clientWidth（346 == 346），空间本来就够，
+     藏掉唯一的后台入口反而让用户找不到后台。
+     正确做法是让副标题和标题给它腾地方： */
+  #tb-brand span { display: none !important; }        /* 副标题「记录与折腾」让位 */
+  #tb-brand .brand-text { min-width: 0 !important; max-width: 88px !important; }
+  #tb-brand b { font-size: 12px !important; }
+  #tb-tabs button { padding: 0 6px !important; font-size: 11px !important; }
+  .tb-admin { padding: 0 7px !important; font-size: 11px !important; }
+  #topbar { padding: 0 6px !important; gap: 3px !important; }
 }
 </style>
 <script>
