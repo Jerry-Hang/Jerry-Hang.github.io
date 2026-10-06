@@ -23,8 +23,10 @@ use crate::sha256;
 
 pub const DEFAULT_USERNAME: &str = "admin";
 pub const DEFAULT_PASSWORD: &str = "change-me-on-first-login";
-const ONE_GIB_KB: u64 = 1024 * 1024;
-const HALF_GIB_KB: u64 = 512 * 1024;
+// 内存熔断阈值（RSS，单位 KB）：超过 MEM_THROTTLE_KB 触发限流（并发减半），
+// 回落到 MEM_RECOVER_KB 以下解除。硬上限由 systemd MemoryMax=512M 兜底。
+const MEM_THROTTLE_KB: u64 = 384 * 1024;
+const MEM_RECOVER_KB: u64 = 256 * 1024;
 const MEM_SAMPLE_SECS: u64 = 1;
 const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=600";
 
@@ -267,9 +269,9 @@ async fn memory_monitor(gate: Arc<Gate>, base: usize) {
     let mut reduced = false;
     loop {
         if let Some(kb) = crate::platform::read_vmrss_kb() {
-            if kb > ONE_GIB_KB {
+            if kb > MEM_THROTTLE_KB {
                 reduced = true;
-            } else if kb < HALF_GIB_KB {
+            } else if kb < MEM_RECOVER_KB {
                 reduced = false;
             }
         }
@@ -865,7 +867,7 @@ async fn serve_static(root_canon: &Path, target: &str) -> Response {
                     .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
                 // HTML 不缓存：页面里内联了 CSS 和 JS（重建后会变），
                 // 如果给长缓存，用户会一直拿到旧页面 —— 实际踩过：
-                // 改了前端里硬编码的后台端口，浏览器仍用缓存里的旧地址。
+                // 改了前端里硬编码的后台端口，浏览器��用缓存里的旧地址。
                 // 静态资源（图片/字体）仍走长缓存，JS/CSS 靠 URL 上的版本号刷新。
                 let cc = if ctype.starts_with("text/html") {
                     "no-cache, must-revalidate"
