@@ -8,7 +8,7 @@ WorkingDirectory=/opt/blog
 Environment=BLOG_ROOT=/opt/blog/frontend
 Environment=BLOG_DB=/opt/blog/blog.db
 Environment=BLOG_CONFIG=/opt/blog/config.toml
-Environment=BLOG_EXT_ADDR=0.0.0.0:8090
+Environment=BLOG_EXT_ADDR=0.0.0.0:80
 Environment=BLOG_LOCAL_ADDR=none
 Environment=BLOG_WORKERS=2
 Environment=BLOG_CPUS=0
