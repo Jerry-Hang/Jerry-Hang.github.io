@@ -1,4 +1,5 @@
 mod base64;
+mod ctl;
 mod db;
 mod platform;
 mod server;
@@ -10,6 +11,10 @@ use std::path::PathBuf;
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if let Some(first) = args.first() {
+        if first == "ctl" {
+            ctl::run(&args[1..]);
+            return;
+        }
         if first == "--hash" {
             let pw = args.get(1).cloned().unwrap_or_default();
             println!("{}", sha256::sha256_hex(pw.as_bytes()));

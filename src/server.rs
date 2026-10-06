@@ -325,23 +325,38 @@ pub async fn run(cfg: Config, ext_addr: &str, local_addr: &str, max_concurrent: 
     });
 
     let ext = TcpListener::bind(ext_addr).await?;
-    let loc = TcpListener::bind(local_addr).await?;
-    eprintln!("external {ext_addr} (tunnel), local {local_addr} (management)");
+    // 管理端口可选：BLOG_LOCAL_ADDR 为空 / "none" / "off" 时不监听。
+    let loc = if local_addr.is_empty()
+        || local_addr.eq_ignore_ascii_case("none")
+        || local_addr.eq_ignore_ascii_case("off")
+    {
+        None
+    } else {
+        Some(TcpListener::bind(local_addr).await?)
+    };
+    if loc.is_some() {
+        eprintln!("external {ext_addr} (tunnel), local {local_addr} (management)");
+    } else {
+        eprintln!("external {ext_addr} (tunnel), local management DISABLED (use `blog_server ctl`)");
+    }
     eprintln!("serving {}, gate={max_concurrent}, db={db_path}", cfg.root.display());
 
     tokio::spawn(memory_monitor(gate.clone(), max_concurrent));
     tokio::spawn(session_cleanup(db.clone()));
 
     let ext_app = Router::new().fallback(external_handler).with_state(state.clone());
-    let loc_app = Router::new().fallback(local_handler).with_state(state.clone());
-
     let t1 = tokio::spawn(async move {
         let _ = axum::serve(ext, ext_app.into_make_service_with_connect_info::<SocketAddr>()).await;
     });
-    let t2 = tokio::spawn(async move {
-        let _ = axum::serve(loc, loc_app.into_make_service_with_connect_info::<SocketAddr>()).await;
-    });
-    let _ = tokio::join!(t1, t2);
+    if let Some(loc) = loc {
+        let loc_app = Router::new().fallback(local_handler).with_state(state.clone());
+        let t2 = tokio::spawn(async move {
+            let _ = axum::serve(loc, loc_app.into_make_service_with_connect_info::<SocketAddr>()).await;
+        });
+        let _ = tokio::join!(t1, t2);
+    } else {
+        let _ = t1.await;
+    }
     Ok(())
 }
 
