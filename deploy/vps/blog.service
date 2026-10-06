@@ -1,0 +1,23 @@
+[Unit]
+Description=Jerry Blog Server (VPS)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/blog
+Environment=BLOG_ROOT=/opt/blog/frontend
+Environment=BLOG_DB=/opt/blog/blog.db
+Environment=BLOG_CONFIG=/opt/blog/config.toml
+Environment=BLOG_EXT_ADDR=0.0.0.0:8090
+Environment=BLOG_LOCAL_ADDR=none
+Environment=BLOG_WORKERS=2
+Environment=BLOG_CPUS=0
+ExecStart=/opt/blog/target/release/blog_server
+Restart=always
+RestartSec=3
+# 内存约束：384M 起软回收，512M 硬上限（超出由内核 OOM 杀进程，Restart=always 会拉起）
+MemoryHigh=384M
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
