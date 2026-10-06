@@ -1,5 +1,10 @@
 # JerryHang Blog Server
 
+> **想直接部署？** 本项目有**三种部署方式**（手机/Termux、Windows、VPS/Linux），各自一个分支。
+> 见 [DEPLOY.md](DEPLOY.md)，或直接切到对应分支：`deploy/android` · `deploy/windows` · `deploy/vps`
+<!-- deploy-branches -->
+
+
 **中文** | [English](README.en.md)
 
 一个**零前端框架、纯 Rust 编写**的轻量级动态博客后端 + 自托管方案。
