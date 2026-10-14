@@ -3233,6 +3233,196 @@ body:not(.dark) .wall-thumb.clean {
   background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 100%) !important;
   text-align: center !important;
 }
+
+/* ==========================================================================
+   移动端与全站图像比例防畸变与防截断精细化适配 (mobile-image-polish)
+   彻底解决：
+   1. 移动端背景壁纸少女主体偏离问题（自动对齐皇冠、脸庞与花束）
+   2. 主页置顶焦点卡与文章列表卡片封面纵向截断问题（保留主体人物与花海骨骼头颅）
+   3. 全站头像（顶栏、作者卡、关于页）严格正圆与等比保持，杜绝各视口挤压变形
+   4. 移动端关于页壁纸选择器 3 列手机竖幅 3:4 比例自适应
+   5. 正文图片与灯箱图片等比自适应兜底
+   ========================================================================== */
+
+/* 1. 移动端背景壁纸主体居中 */
+@media (max-width: 768px) {
+  #wallpaper {
+    background-position: 38% 28% !important;
+    background-size: cover !important;
+  }
+}
+
+/* 2. 主页置顶焦点卡封面图 (arch.jpg / 自我介绍) */
+.hc-cover {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+  object-position: center 22% !important;
+  flex: none !important;
+  flex-shrink: 0 !important;
+  border-radius: 24px 24px 0 0 !important;
+}
+@media (max-width: 768px) {
+  .hc-cover {
+    aspect-ratio: 16 / 10 !important;
+    object-position: center 20% !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+/* 3. 文章列表卡片缩略图 (skull.jpg / avatar3.jpg) 彻底消灭「只露肋骨无头颅」截断 */
+.home-item .hi-cover,
+.home-grid .home-item .hi-cover {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+  object-position: center 20% !important;
+  flex: none !important;
+  flex-shrink: 0 !important;
+  border-radius: 18px 18px 0 0 !important;
+  margin: 0 !important;
+}
+@media (max-width: 768px) {
+  .home-item .hi-cover,
+  .home-grid .home-item .hi-cover {
+    aspect-ratio: 16 / 10 !important;
+    object-position: center 18% !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+}
+
+/* 4. 全站头像正圆与等比保持：顶栏头像、作者卡头像、关于页头像 */
+#tb-brand .brand-avatar {
+  width: 32px !important;
+  height: 32px !important;
+  aspect-ratio: 1 / 1 !important;
+  flex: 0 0 32px !important;
+  flex-shrink: 0 !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+}
+
+.pc-avatar {
+  width: 80px !important;
+  height: 80px !important;
+  aspect-ratio: 1 / 1 !important;
+  flex: 0 0 80px !important;
+  flex-shrink: 0 !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  margin: 0 auto 14px !important;
+  box-sizing: border-box !important;
+}
+.pc-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  border: none !important;
+}
+
+.about-side .avatar,
+.about-card .avatar {
+  width: 96px !important;
+  height: 96px !important;
+  aspect-ratio: 1 / 1 !important;
+  flex: 0 0 96px !important;
+  flex-shrink: 0 !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  margin: 0 auto 16px !important;
+  box-sizing: border-box !important;
+}
+.about-side .avatar img,
+.about-card .avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  border: none !important;
+}
+
+/* 5. 关于页在移动端的内边距与壁纸网格优化 (竖版壁纸以 3:4 手机竖幅 3 列预览) */
+@media (max-width: 768px) {
+  #view-about {
+    padding: 16px 12px 48px !important;
+  }
+  .about-card {
+    padding: 20px 14px !important;
+  }
+  .about-main {
+    padding: 16px 12px !important;
+  }
+  .wall-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+  .wall-thumb {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: 3 / 4 !important;
+    background-position: center 20% !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* 6. 正文插入图片等比缩放兜底 */
+#r-body img,
+.md-body img {
+  display: block !important;
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+  border-radius: 14px !important;
+  margin: 18px auto !important;
+}
+
+/* 7. 超窄屏 (<=400px 如 360px 常见 Android) 顶栏紧凑优化，避免 JerryHang 被截字 */
+@media (max-width: 400px) {
+  #topbar {
+    padding: 0 6px !important;
+    gap: 4px !important;
+  }
+  #tb-brand {
+    gap: 6px !important;
+  }
+  #tb-brand .brand-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    flex: 0 0 28px !important;
+  }
+  #tb-brand b {
+    font-size: 13px !important;
+  }
+  #tb-tabs {
+    gap: 2px !important;
+  }
+  #tb-tabs button {
+    padding: 0 6px !important;
+    font-size: 11.5px !important;
+    height: 28px !important;
+  }
+  .icon-btn, .tb-menu, #theme-btn {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    padding: 0 !important;
+  }
+}
 </style>
 <script>
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
