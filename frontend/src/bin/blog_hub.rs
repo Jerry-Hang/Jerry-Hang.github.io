@@ -144,17 +144,28 @@ fn today() -> (i64, u32, u32) {
 
 fn slugify(s: &str) -> String {
     let mut out = String::new();
-    let mut prev_space = false;
+    let mut prev_dash = false;
     for ch in s.trim().chars() {
-        if ch.is_whitespace() {
-            if !prev_space && !out.is_empty() { out.push('-'); }
-            prev_space = true;
-        } else {
-            out.push(ch);
-            prev_space = false;
+        if ch.is_alphanumeric() {
+            if ch.is_ascii_alphabetic() {
+                out.push(ch.to_ascii_lowercase());
+            } else {
+                out.push(ch);
+            }
+            prev_dash = false;
+        } else if ch == '-' || ch == '_' || ch.is_whitespace() {
+            if !prev_dash && !out.is_empty() {
+                out.push('-');
+                prev_dash = true;
+            }
         }
     }
-    out.trim_end_matches('-').to_string()
+    let res = out.trim_matches('-').to_string();
+    if res.is_empty() {
+        "post".to_string()
+    } else {
+        res
+    }
 }
 
 fn repo_dir() -> Result<PathBuf, String> {

@@ -261,23 +261,35 @@ fn url_encode_path(s: &str) -> String {
 fn generate_pages(posts: &[Post]) {
     let tpl = match fs::read_to_string("index.html") {
         Ok(t) => t,
-        Err(_) => { eprintln!("未找到 index.html 模板，跳过独立页生成"); return; }
+        Err(e) => {
+            eprintln!("错误: 当前目录下未找到 index.html 模板文件（{e}），跳过独立文章页生成！请确保在 frontend/ 目录下执行。");
+            return;
+        }
     };
+    let marker = "<script src=\"/app.js";
+    if !tpl.contains(marker) {
+        eprintln!("警告: index.html 模板中未找到注入标记 '{marker}'，生成的文章页将缺少 window.__ARTICLE__ 数据注入！");
+    }
     let mut ok_w = 0;
     for p in posts {
         let dir = format!("blog/{}", p.slug);
-        if fs::create_dir_all(&dir).is_err() { continue; }
+        if let Err(e) = fs::create_dir_all(&dir) {
+            eprintln!("警告: 创建目录 {dir} 失败: {e}");
+            continue;
+        }
         let inject = format!(
             "<script>window.__ARTICLE__ = \"{}\";</script>\n",
             xml_escape(&p.slug)
         );
-        let marker = "<script src=\"/app.js";
         let out = if let Some(i) = tpl.find(marker) {
             format!("{}{}{}", &tpl[..i], inject, &tpl[i..])
         } else {
             tpl.clone()
         };
-        if fs::write(format!("{dir}/index.html"), out).is_ok() { ok_w += 1; }
+        match fs::write(format!("{dir}/index.html"), out) {
+            Ok(_) => ok_w += 1,
+            Err(e) => eprintln!("警告: 写入 {dir}/index.html 失败: {e}"),
+        }
     }
     println!("✔ 已生成 {} 个独立文章页（blog/<slug>/）", ok_w);
 }
@@ -390,12 +402,26 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 
 fn slugify(s: &str) -> String {
     let mut out = String::new();
-    let mut prev_space = false;
+    let mut prev_dash = false;
     for ch in s.trim().chars() {
-        if ch.is_whitespace() {
-            if !prev_space && !out.is_empty() { out.push('-'); }
-            prev_space = true;
-        } else { out.push(ch); prev_space = false; }
+        if ch.is_alphanumeric() {
+            if ch.is_ascii_alphabetic() {
+                out.push(ch.to_ascii_lowercase());
+            } else {
+                out.push(ch);
+            }
+            prev_dash = false;
+        } else if ch == '-' || ch == '_' || ch.is_whitespace() {
+            if !prev_dash && !out.is_empty() {
+                out.push('-');
+                prev_dash = true;
+            }
+        }
     }
-    out.trim_end_matches('-').to_string()
+    let res = out.trim_matches('-').to_string();
+    if res.is_empty() {
+        "post".to_string()
+    } else {
+        res
+    }
 }
