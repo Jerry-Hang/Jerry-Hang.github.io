@@ -26,11 +26,20 @@ function isLandscape() { return window.innerWidth > window.innerHeight; }
 function activeWalls() {
   return WALLS.filter(w => w.orient === "any" || (isLandscape() ? w.orient === "landscape" : w.orient === "portrait"));
 }
-const DEFAULT_WALL = () => "clean";
+const DEFAULT_WALL = () => isLandscape() ? "banner" : "skull";
+
+const wallSaved = localStorage.getItem("jb_wall2");
+const wallMigrated = localStorage.getItem("jb_wall_m2");
+let initWall = wallSaved;
+if (!wallSaved || !wallMigrated || wallSaved === "clean") {
+  initWall = DEFAULT_WALL();
+  localStorage.setItem("jb_wall2", initWall);
+  localStorage.setItem("jb_wall_m2", "1");
+}
 
 const state = {
   theme: localStorage.getItem("jb_theme") || "dark",
-  wall: localStorage.getItem("jb_wall2") || DEFAULT_WALL(),
+  wall: initWall,
   posts: [],
   q: "",
   sideMode: "cat",
@@ -72,9 +81,12 @@ function applyWall() {
     w = WALLS.find(x => x.id === state.wall);
   }
   const el = document.getElementById("wallpaper");
-  if (el) el.style.backgroundImage = w.img ? "url('" + w.img + "')" : "none";
-  // 有壁纸图时给 body 加标记，让极光那层 !important 渐变让位（见 index.html 的说明）
-  document.body.classList.toggle("has-wall", !!w.img);
+  const isClean = !w || w.id === "clean" || !w.img;
+  if (el) {
+    el.style.backgroundImage = isClean ? "none" : "url('" + w.img + "')";
+  }
+  document.body.classList.toggle("wall-clean", isClean);
+  document.body.classList.toggle("has-wall", !isClean);
   localStorage.setItem("jb_wall2", state.wall);
 }
 
@@ -422,8 +434,8 @@ function showView(name) {
     if (v) v.classList.add("on");
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   document.body.classList.toggle("reading", name === "reader");
-  // 首页用固定大图背景，其他视图回到极光底
-  document.body.classList.toggle("home-bg", name === "home");
+  // 全局保持个性化背景一致
+  document.body.classList.toggle("home-bg", true);
   state.nav = name;
   if (name !== "reader") { state.sideView = "posts"; renderSide(); }
   if (window.innerWidth <= 720) toggleSidebar(false);
@@ -636,10 +648,20 @@ function openArticle(idx) {
   const prev = state.posts[idx - 1];
   const next = state.posts[idx + 1];
   document.getElementById("r-foot").innerHTML =
-    '<button class="pn-btn' + (prev ? "" : " disabled") + '" id="r-prev">‹ ' + (prev ? esc(prev.title) : "已是最早") + '</button>' +
-    '<button class="pn-btn" id="r-back">返回</button>' +
-    '<button class="pn-btn" id="r-copy">复制链接</button>' +
-    '<button class="pn-btn' + (next ? "" : " disabled") + '" id="r-next">' + (next ? esc(next.title) : "已是最新") + ' ›</button>';
+    '<div class="r-foot-pagers">' +
+      '<button class="pn-btn pn-prev' + (prev ? "" : " disabled") + '" id="r-prev" title="' + (prev ? esc(prev.title) : "") + '">' +
+        '<span class="pn-arrow">‹</span>' +
+        '<span class="pn-text"><small>上一篇</small><b>' + (prev ? esc(prev.title) : "已是最早") + '</b></span>' +
+      '</button>' +
+      '<button class="pn-btn pn-next' + (next ? "" : " disabled") + '" id="r-next" title="' + (next ? esc(next.title) : "") + '">' +
+        '<span class="pn-text"><small>下一篇</small><b>' + (next ? esc(next.title) : "已是最新") + '</b></span>' +
+        '<span class="pn-arrow">›</span>' +
+      '</button>' +
+    '</div>' +
+    '<div class="r-foot-actions">' +
+      '<button class="act-btn" id="r-back"><span class="act-icon">🏠</span><span>返回主页</span></button>' +
+      '<button class="act-btn" id="r-copy"><span class="act-icon">🔗</span><span>复制链接</span></button>' +
+    '</div>';
   document.getElementById("r-copy").addEventListener("click", copyPageLink);
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
   if (next) document.getElementById("r-next").addEventListener("click", () => selectArticle(idx + 1));
@@ -840,13 +862,25 @@ function renderToc(mdBody, outline) {
   if (items.length < 3) { box.hidden = true; box.innerHTML = ""; return; }
 
   box.hidden = false;
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) box.classList.add("collapsed"); else box.classList.remove("collapsed");
   box.innerHTML =
-    '<div class="toc-head">本文目录</div><ol>' +
+    '<div class="toc-head" role="button" tabindex="0" aria-expanded="' + (!isMobile) + '">' +
+      '<span>本文目录</span><span class="toc-icon">▾</span>' +
+    '</div><ol>' +
     items.map(x =>
       '<li><a href="#' + esc(x.id) + '" class="lv-' + x.level + '" data-target="' + esc(x.id) + '">' +
         esc(x.text) + '</a></li>'
     ).join("") +
     '</ol>';
+
+  const head = box.querySelector(".toc-head");
+  if (head) {
+    head.addEventListener("click", () => {
+      box.classList.toggle("collapsed");
+      head.setAttribute("aria-expanded", String(!box.classList.contains("collapsed")));
+    });
+  }
 
   // 平滑滚动（顶栏高度留白由 CSS 的 scroll-margin-top 处理）
   box.querySelectorAll("a").forEach(a => {
@@ -1130,18 +1164,20 @@ function openFromHashIfAny() {
   const bar = document.getElementById("progress-bar");
   let show = false;
   window.addEventListener("scroll", () => {
-    const s = window.scrollY > 480;
-    if (s !== show) { show = s; btn.classList.toggle("show", s); }
+    const s = window.scrollY > 300;
+    if (s !== show) { show = s; if (btn) btn.classList.toggle("show", s); }
     const doc = document.documentElement;
     const max = doc.scrollHeight - window.innerHeight;
-    if (max > 0 && document.body.classList.contains("reading")) {
-      bar.style.width = Math.min(100, (window.scrollY / max) * 100).toFixed(2) + "%";
-      bar.classList.add("show");
-    } else {
-      bar.classList.remove("show");
+    if (bar) {
+      if (max > 0 && document.body.classList.contains("reading")) {
+        bar.style.width = Math.min(100, (window.scrollY / max) * 100).toFixed(2) + "%";
+        bar.classList.add("show");
+      } else {
+        bar.classList.remove("show");
+      }
     }
   }, { passive: true });
-  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  if (btn) btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 })();
 
 /* 滚动收缩：顶部横条 → 悬浮胶囊（平滑过渡） */
