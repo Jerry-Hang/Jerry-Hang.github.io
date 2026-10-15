@@ -2,7 +2,7 @@
 
 > 平台：Android 7.0+ / Termux
 > 目标：把博客服务做成**开机自启 + 崩溃自愈 + 公网可访问**的常驻服务
-> 对应脚本：`deploy/blog_server.run`、`deploy/blog_health.run`、`deploy/termux-boot-start.sh`
+> 对应脚本：`deploy/android/blog_server.run`、`deploy/android/blog_health.run`、`deploy/android/termux-boot-start.sh`
 
 ---
 
@@ -225,7 +225,7 @@ export BLOG_ROOT="$PWD/frontend"
 export BLOG_DB="$PWD/blog.db"
 export BLOG_CONFIG="$PWD/config.toml"
 export BLOG_EXT_ADDR="0.0.0.0:8090"        # 公网/局域网只读口
-export BLOG_LOCAL_ADDR="127.0.0.1:8091"    # 管理口，只绑回环
+export BLOG_LOCAL_ADDR="none"              # 默认关闭 Web 管理端口（杜绝网页跳板），如需本机网页调试可设为 127.0.0.1:8091
 export BLOG_WORKERS=4                       # 按手机核数调，4 核就写 4
 export BLOG_CPUS="0-3"                      # 绑到哪些核
 export BLOG_MAX_CONCURRENT=2400             # 并发上限，超了返 503
@@ -237,56 +237,62 @@ export BLOG_MAX_CONCURRENT=2400             # 并发上限，超了返 503
 
 ```
 cpu affinity set to 0-3
-external 0.0.0.0:8090 (tunnel), local 127.0.0.1:8091 (management)
+external 0.0.0.0:8090 (tunnel), local none (management disabled)
 serving /data/data/com.termux/files/home/blog/frontend, gate=2400, db=.../blog.db
 ```
 
-**验证**（另开一个 Termux 会话，或按 `Ctrl+C` 前先在浏览器试）：
+**验证**（另开一个 Termux 会话）：
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8090/     # 期望 200
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8091/     # 期望 302（跳登录页）
 ```
 
-> **为什么 8091 返回 302 而不是 200 才是对的**：
-> 管理首页要求登录，未登录会被重定向到 `/login`。
-> 如果 8091 返回 **200**，说明认证没生效——这是严重问题，别对外发布。
->
-> **为什么端口是 8090/8091 而不是代码默认的 8080/8081**：
-> 纯属这台机器的历史原因（8080/8081 被 llama.cpp 占了）。
-> 你在手机上用**默认的 8080/8081 完全没问题**，脚本里改成对应值即可。
+### 4.1 后台管理（SSH 公私钥验证 + 本地 CLI）
 
-### 4.1 后台在哪
+按照安全规范：**访问后台的连接必须是经过公钥与私钥验证过的设备（SSH），否则其他的访问不仅不允许，更不提供任何和显示访问连接、跳板或 UI**。
 
-管理后台只绑 `127.0.0.1`。手机上直接用 Termux 的浏览器打开
-`http://127.0.0.1:8091/`，输入第 3 节设的账号密码。
+因此后台管理收敛到 SSH 密钥登录 + 本地 `blog_server ctl` 命令行，不再对外暴露任何网页执行接口：
 
-**从电脑管理**（推荐，屏幕大）：
+**1. 手机配置 SSH（仅限公钥认证）**：
 
 ```bash
-# 手机侧：装 sshd
 pkg install -y openssh
-sshd
-whoami        # 记住这个用户名，电脑上要用
-passwd        # 设一个 SSH 密码
+# 把你在电脑生成的 id_ed25519.pub 公钥加到 Termux 中：
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+cat >> ~/.ssh/authorized_keys <<'EOF'
+ssh-ed25519 AAAA... 管理员公钥
+EOF
+chmod 600 ~/.ssh/authorized_keys
+
+sshd -p 8022
 ```
 
-然后在电脑上建 SSH 隧道（**PowerShell / 终端**）：
+**2. 在 SSH 终端内使用 `blog_server ctl` 本地管理博客**：
 
 ```bash
-ssh -N -L 8091:127.0.0.1:8091 -p 8022 u0_a123@192.168.1.50
+# 查看所有文章列表
+./target/release/blog_server ctl list
+
+# 查看指定文章内容
+./target/release/blog_server ctl show about-me
+
+# 新增文章
+./target/release/blog_server ctl new --title "测试文章" --file /path/to/post.md --desc "描述"
+
+# 编辑修改文章
+./target/release/blog_server ctl edit 1 --title "新标题" --file /path/to/post.md
+
+# 删除文章
+./target/release/blog_server ctl rm 1
+
+# 批量从 Markdown 目录同步/覆盖导入文章
+./target/release/blog_server ctl import frontend/_posts --force
+
+# 查看后台访问与安全拦截日志（支持分页、类别筛选）
+./target/release/blog_server ctl logs --page 1 --per 20 --cat blocked
 ```
 
-- `-N` 只转发不开 shell
-- `-L 8091:127.0.0.1:8091` 把**手机的** 8091 映射到**电脑的** 8091
-- `8022` 是 Termux sshd 的默认端口（不是 22）
-- `u0_a123` 换成 `whoami` 的输出，`192.168.1.50` 换成手机 IP
-
-保持这个窗口开着，电脑浏览器访问 `http://127.0.0.1:8091/` 就是手机上的后台。
-
-> **为什么不用 `ssh -L 8091:127.0.0.1:8091` 直接连手机 IP 上的 8091？**
-> 因为服务**只绑回环**，从局域网访问手机的 `192.168.1.50:8091` 是连不上的——
-> 这正是设计意图。必须用 SSH 隧道从手机内部访问。
+> **注**：如确实需要在手机本地浏览器使用 Web UI，可临时指定 `export BLOG_LOCAL_ADDR="127.0.0.1:8091"` 启动，并通过 SSH 端口转发（`-L 8091:127.0.0.1:8091`）在管理机访问。此时所有系统命令执行接口均已被彻底移除，杜绝任何跳板利用风险。
 
 ---
 
@@ -315,7 +321,7 @@ echo $SVDIR
 
 ```bash
 mkdir -p $PREFIX/var/service/blog_server
-cp ~/blog/deploy/blog_server.run $PREFIX/var/service/blog_server/run
+cp ~/blog/deploy/android/blog_server.run $PREFIX/var/service/blog_server/run
 chmod +x $PREFIX/var/service/blog_server/run
 ```
 
@@ -336,7 +342,7 @@ export BLOG_WORKERS="${BLOG_WORKERS:-4}"
 export BLOG_CPUS="${BLOG_CPUS:-0-3}"
 export BLOG_MAX_CONCURRENT="${BLOG_MAX_CONCURRENT:-2400}"
 export BLOG_EXT_ADDR="0.0.0.0:8090"
-export BLOG_LOCAL_ADDR="127.0.0.1:8091"
+export BLOG_LOCAL_ADDR="none"
 
 # 拿唤醒锁：防止 CPU 休眠把服务冻住。失败也不影响启动
 termux-wake-lock || true
@@ -404,7 +410,7 @@ runit 只能保证"**进程死了**就拉起"。它管不了这种情况：
 
 ```bash
 mkdir -p $PREFIX/var/service/blog_health
-cp ~/blog/deploy/blog_health.run $PREFIX/var/service/blog_health/run
+cp ~/blog/deploy/android/blog_health.run $PREFIX/var/service/blog_health/run
 chmod +x $PREFIX/var/service/blog_health/run
 ```
 
@@ -492,7 +498,7 @@ sv status blog_health
 
 ```bash
 mkdir -p ~/.termux/boot
-cp ~/blog/deploy/termux-boot-start.sh ~/.termux/boot/start_blog.sh
+cp ~/blog/deploy/android/termux-boot-start.sh ~/.termux/boot/start_blog.sh
 chmod +x ~/.termux/boot/start_blog.sh
 ```
 
@@ -620,6 +626,13 @@ sqlite3 ~/blog/blog.db "select count(*) from sessions;"
 
 # —— 数据库完整性（怀疑掉电损坏时）——
 sqlite3 ~/blog/blog.db "pragma integrity_check;"
+
+# —— 博客管理 CLI（SSH 本地维护，绝不暴露 Web 跳板）——
+~/blog/target/release/blog_server ctl list                                   # 文章列表
+~/blog/target/release/blog_server ctl show <slug|id>                         # 查看文章
+~/blog/target/release/blog_server ctl logs --page 1 --per 20                 # 查看访问日志
+~/blog/target/release/blog_server ctl logs --cat blocked                     # 查看安全封禁拦截
+~/blog/target/release/blog_server ctl import frontend/_posts --force        # 导入文章
 
 # —— 改密码 ——
 ~/blog/target/release/blog_server --hash '新密码'    # 把输出填进 config.toml
@@ -784,9 +797,10 @@ bash ~/.termux/boot/start_blog.sh
 │   ├── config.toml                    ← 账号 + 密码哈希（★ 绝不入库）
 │   ├── logs/                          ← 运行日志
 │   └── deploy/
-│       ├── blog_server.run            ← runit 服务脚本
-│       ├── blog_health.run            ← 看门狗
-│       └── termux-boot-start.sh       ← 开机脚本
+│       └── android/
+│           ├── blog_server.run            ← runit 服务脚本
+│           ├── blog_health.run            ← 看门狗
+│           └── termux-boot-start.sh       ← 开机脚本
 └── .termux/boot/start_blog.sh         ← 开机脚本的安装位置
 
 /data/data/com.termux/files/usr/var/service/
