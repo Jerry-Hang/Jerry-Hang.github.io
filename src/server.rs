@@ -24,9 +24,12 @@ use crate::sha256;
 pub const DEFAULT_USERNAME: &str = "admin";
 pub const DEFAULT_PASSWORD: &str = "change-me-on-first-login";
 // 内存熔断阈值（RSS，单位 KB）：超过 MEM_THROTTLE_KB 触发限流（并发减半），
-// 回落到 MEM_RECOVER_KB 以下解除。硬上限由 systemd MemoryMax=512M 兜底。
-const MEM_THROTTLE_KB: u64 = 384 * 1024;
-const MEM_RECOVER_KB: u64 = 256 * 1024;
+// 超过 MEM_CRITICAL_KB 降至 10%，超过 MEM_EMERGENCY_KB 紧急熔断（拒收新连接防 OOM），
+// 回落到 MEM_RECOVER_KB 以下恢复。系统级硬上限由 systemd MemoryMax=512M 兜底。
+const MEM_THROTTLE_KB: u64 = 384 * 1024; // 384 MB (75% of 512MB)
+const MEM_CRITICAL_KB: u64 = 448 * 1024; // 448 MB (87.5% of 512MB)
+const MEM_EMERGENCY_KB: u64 = 480 * 1024; // 480 MB (93.75% of 512MB)
+const MEM_RECOVER_KB: u64 = 256 * 1024;  // 256 MB (50% of 512MB)
 const MEM_SAMPLE_SECS: u64 = 1;
 const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=600";
 
@@ -266,27 +269,135 @@ impl Drop for GateGuard {
 // 内存 / CPU 统计改为走 platform 模块（Unix 读 /proc，Windows 走 Win32 API）
 
 async fn memory_monitor(gate: Arc<Gate>, base: usize) {
-    let mut reduced = false;
+    let mut throttle_level = 0; // 0: 正常, 1: 50%限流, 2: 10%重度降级, 3: 紧急熔断
     loop {
         if let Some(kb) = crate::platform::read_vmrss_kb() {
-            if kb > MEM_THROTTLE_KB {
-                reduced = true;
-            } else if kb < MEM_RECOVER_KB {
-                reduced = false;
+            if kb >= MEM_EMERGENCY_KB {
+                throttle_level = 3;
+            } else if kb >= MEM_CRITICAL_KB {
+                throttle_level = 2;
+            } else if kb >= MEM_THROTTLE_KB {
+                if throttle_level < 1 {
+                    throttle_level = 1;
+                }
+            } else if kb <= MEM_RECOVER_KB {
+                throttle_level = 0;
             }
         }
-        let limit = if reduced { (base / 2).max(1) } else { base.max(1) };
+        let limit = match throttle_level {
+            3 => 0,                  // 紧急熔断（>= 480MB）：拒收新连接，防止触发内核 512MB OOM
+            2 => (base / 10).max(4), // 重度限流（>= 448MB）：并发压至 10%
+            1 => (base / 2).max(1),  // 一级限流（>= 384MB）：并发减半
+            _ => base.max(1),        // 恢复正常（<= 256MB）：100% 满负荷
+        };
         gate.effective.store(limit, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_secs(MEM_SAMPLE_SECS)).await;
     }
 }
 
-async fn session_cleanup(db: Arc<Db>) {
+// ---------------------------------------------------------------------------
+// 防爆破与 DDoS 频率限制器（纯内存滑动窗口，防恶意洪水与路径枚举扫描）
+// ---------------------------------------------------------------------------
+struct IpState {
+    window_start: Instant,
+    req_count: u32,
+    scan_count: u32,
+    banned_until: Option<Instant>,
+}
+
+struct IpRateLimiter {
+    records: RwLock<HashMap<String, IpState>>,
+}
+
+impl IpRateLimiter {
+    fn new() -> Self {
+        Self {
+            records: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// 检查该 IP 是否被封禁或请求超频。
+    /// 正常返回 Ok(())；超频返回 Err((StatusCode, 提示信息))。
+    fn check_and_record(&self, ip: &str) -> Result<(), (StatusCode, &'static str)> {
+        let now = Instant::now();
+        let mut map = self.records.write().unwrap();
+        let entry = map.entry(ip.to_string()).or_insert_with(|| IpState {
+            window_start: now,
+            req_count: 0,
+            scan_count: 0,
+            banned_until: None,
+        });
+
+        // 1. 是否正处于封禁期
+        if let Some(until) = entry.banned_until {
+            if now < until {
+                return Err((StatusCode::TOO_MANY_REQUESTS, "IP temporarily rate-limited"));
+            } else {
+                entry.banned_until = None;
+                entry.window_start = now;
+                entry.req_count = 0;
+                entry.scan_count = 0;
+            }
+        }
+
+        // 2. 10 秒滑动窗口
+        let elapsed = now.duration_since(entry.window_start);
+        if elapsed >= Duration::from_secs(10) {
+            entry.window_start = now;
+            entry.req_count = 1;
+        } else {
+            entry.req_count += 1;
+            // 10秒内超过120次请求（正常浏览通常一次载入15-20次），判定为洪水/爬虫
+            if entry.req_count > 120 {
+                entry.banned_until = Some(now + Duration::from_secs(60));
+                return Err((StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded (flood)"));
+            }
+        }
+        Ok(())
+    }
+
+    /// 当请求返回 404 时记录一次探测。若频繁 404 判定为恶意路径枚举并封禁。
+    fn record_scan_error(&self, ip: &str) {
+        let now = Instant::now();
+        let mut map = self.records.write().unwrap();
+        let entry = map.entry(ip.to_string()).or_insert_with(|| IpState {
+            window_start: now,
+            req_count: 0,
+            scan_count: 0,
+            banned_until: None,
+        });
+        entry.scan_count += 1;
+        if entry.scan_count >= 15 {
+            // 连续 15 次 404，临时封禁 5 分钟
+            entry.banned_until = Some(now + Duration::from_secs(300));
+        }
+    }
+
+    /// 定期清理过期条目，保持内存轻量（上限 10,000 个 IP）
+    fn prune(&self) {
+        let now = Instant::now();
+        let mut map = self.records.write().unwrap();
+        if map.len() > 10000 {
+            map.clear();
+            return;
+        }
+        map.retain(|_, state| {
+            if let Some(b) = state.banned_until {
+                b > now
+            } else {
+                now.duration_since(state.window_start) < Duration::from_secs(30)
+            }
+        });
+    }
+}
+
+async fn session_cleanup(db: Arc<Db>, rate_limiter: Arc<IpRateLimiter>) {
     // 会话过期检查：每分钟一次（原行为，保持不变）
     let mut last_prune = Instant::now();
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
         db.delete_expired_sessions();
+        rate_limiter.prune();
 
         // 请求日志清理：每天一次。
         // request_logs 原来只增不减，公网跑久了数据库和 WAL 会无限增长。
@@ -306,6 +417,7 @@ async fn session_cleanup(db: Arc<Db>) {
 struct AppState {
     cfg: RwLock<Config>,
     gate: Arc<Gate>,
+    rate_limiter: Arc<IpRateLimiter>,
     root_canon: PathBuf,
     db: Arc<Db>,
     start: Instant,
@@ -316,9 +428,11 @@ pub async fn run(cfg: Config, ext_addr: &str, local_addr: &str, max_concurrent: 
     let db = Db::open(Path::new(db_path)).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     let db = Arc::new(db);
     let gate = Arc::new(Gate::new(max_concurrent));
+    let rate_limiter = Arc::new(IpRateLimiter::new());
     let state = Arc::new(AppState {
         cfg: RwLock::new(cfg.clone()),
         gate: gate.clone(),
+        rate_limiter: rate_limiter.clone(),
         root_canon,
         db: db.clone(),
         start: Instant::now(),
@@ -342,7 +456,7 @@ pub async fn run(cfg: Config, ext_addr: &str, local_addr: &str, max_concurrent: 
     eprintln!("serving {}, gate={max_concurrent}, db={db_path}", cfg.root.display());
 
     tokio::spawn(memory_monitor(gate.clone(), max_concurrent));
-    tokio::spawn(session_cleanup(db.clone()));
+    tokio::spawn(session_cleanup(db.clone(), rate_limiter.clone()));
 
     let ext_app = Router::new().fallback(external_handler).with_state(state.clone());
     let t1 = tokio::spawn(async move {
@@ -411,7 +525,7 @@ fn classify(ua: &str, status: i64) -> &'static str {
     }
     if status == 404 {
         "scan"
-    } else if status == 503 {
+    } else if status == 503 || status == 429 {
         "blocked"
     } else if status == 401 {
         "bruteforce"
@@ -426,7 +540,24 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
     let ua = ua_of(&req);
     // 在 req 被消费前取出真实访客 IP（经隧道时 peer 是回环，不能直接用）
     let ip = client_ip(req.headers(), &peer);
+
+    // 防爆破与 DDoS 频率限制
+    if let Err((status, msg)) = state.rate_limiter.check_and_record(&ip) {
+        let resp = Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .header(header::RETRY_AFTER, "60")
+            .header(header::CACHE_CONTROL, "no-store")
+            .body(Body::from(msg))
+            .unwrap();
+        log_response(&state, &ip, &method, &path, &ua, &resp);
+        return resp;
+    }
+
     let resp = external_dispatch(&state, &peer, req).await;
+    if resp.status() == StatusCode::NOT_FOUND {
+        state.rate_limiter.record_scan_error(&ip);
+    }
     log_response(&state, &ip, &method, &path, &ua, &resp);
     resp
 }
@@ -496,8 +627,7 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
     }
 
     // ---- API：未认证返回 401 JSON ----
-    let priv_op = path == "/api/admin/exec" || path == "/api/admin/file";
-    let cookies = match check_auth(state, req.headers(), priv_op) {
+    let cookies = match check_auth(state, req.headers(), false) {
         Ok(c) => c,
         Err(_) => return unauthorized(),
     };
@@ -579,9 +709,9 @@ fn add_cookies(resp: &mut Response, cookies: &[(String, String, i64)]) {
 
 async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool, local: bool, headers: &HeaderMap) -> Response {
     match path {
-        "/posts.json" => serve_posts_json(state).await,
+        "/posts.json" => serve_posts_json(state, headers).await,
         _ if path.starts_with("/post/") => serve_post_html(state, &path["/post/".len()..]).await,
-        _ => read_static(state, path, local).await,
+        _ => read_static(state, path, local, headers).await,
     }
 }
 
@@ -590,7 +720,7 @@ async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool, local: boo
 /// local = 是否本机访问（见 is_local_access）。
 ///         为 false 时把「查看后台」那段删掉 —— 管理端只绑 127.0.0.1，
 ///         局域网和外网的人点了也打不开，不如不显示。
-async fn read_static(state: &Arc<AppState>, path: &str, local: bool) -> Response {
+async fn read_static(state: &Arc<AppState>, path: &str, local: bool, headers: &HeaderMap) -> Response {
     // 先确认是 HTML 才读进内存做替换；其余文件走原来的静态文件路径
     let is_html = match resolve_target(&state.root_canon, path) {
         Some(ref f) => content_type(f).starts_with("text/html"),
@@ -598,7 +728,7 @@ async fn read_static(state: &Arc<AppState>, path: &str, local: bool) -> Response
     };
 
     if !is_html {
-        return serve_static(&state.root_canon, path).await;
+        return serve_static(&state.root_canon, path, headers).await;
     }
 
     let Some(file) = resolve_target(&state.root_canon, path) else {
@@ -612,14 +742,27 @@ async fn read_static(state: &Arc<AppState>, path: &str, local: bool) -> Response
     html_response(if local { text } else { strip_local_only(&text) })
 }
 
-async fn serve_posts_json(state: &Arc<AppState>) -> Response {
+async fn serve_posts_json(state: &Arc<AppState>, headers: &HeaderMap) -> Response {
     let posts = state.db.list_posts();
     let arr: Vec<serde_json::Value> = posts.iter().map(post_json).collect();
     let body = serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string());
+    let etag = format!("\"posts-{}\"", &sha256::sha256_hex(body.as_bytes())[..16]);
+    if let Some(inm) = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+        if inm.trim() == etag {
+            return Response::builder()
+                .status(StatusCode::NOT_MODIFIED)
+                .header(header::ETAG, etag)
+                .header(header::CACHE_CONTROL, CACHE_CONTROL)
+                .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+                .body(Body::empty())
+                .unwrap();
+        }
+    }
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
         .header(header::CACHE_CONTROL, CACHE_CONTROL)
+        .header(header::ETAG, etag)
         .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
         .body(Body::from(body))
         .unwrap()
@@ -776,36 +919,6 @@ async fn handle_admin_api(state: &Arc<AppState>, path: &str, req: Request) -> Re
                 "gate_limit": gate_limit,
             }),
         )
-    } else if path == "/api/admin/exec" {
-        let v = read_json(req).await;
-        let cmd = v["cmd"].as_str().unwrap_or("").to_string();
-        if cmd.is_empty() {
-            return json_response(StatusCode::BAD_REQUEST, json!({"error": "cmd required"}));
-        }
-        let out = std::process::Command::new("sh").arg("-c").arg(&cmd).output();
-        match out {
-            Ok(o) => json_response(
-                StatusCode::OK,
-                json!({
-                    "code": o.status.code().unwrap_or(-1),
-                    "stdout": String::from_utf8_lossy(&o.stdout).to_string(),
-                    "stderr": String::from_utf8_lossy(&o.stderr).to_string(),
-                }),
-            ),
-            Err(e) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": e.to_string()})),
-        }
-    } else if path == "/api/admin/file" {
-        let p = query_param(req.uri(), "path").unwrap_or_default();
-        if p.is_empty() {
-            return json_response(StatusCode::BAD_REQUEST, json!({"error": "path required"}));
-        }
-        match fs::read(&p) {
-            Ok(bytes) => json_response(
-                StatusCode::OK,
-                json!({"path": p, "size": bytes.len(), "content": String::from_utf8_lossy(&bytes).to_string()}),
-            ),
-            Err(e) => json_response(StatusCode::NOT_FOUND, json!({"error": e.to_string()})),
-        }
     } else {
         not_found()
     }
@@ -861,46 +974,74 @@ fn json_response(status: StatusCode, value: serde_json::Value) -> Response {
         .unwrap()
 }
 
-async fn serve_static(root_canon: &Path, target: &str) -> Response {
-    match resolve_target(root_canon, target) {
-        Some(file) => match fs::read(&file) {
-            Ok(body) => {
-                let len = body.len();
-                let ctype = content_type(&file);
-                let mut resp = Response::new(Body::from(body));
-                *resp.status_mut() = StatusCode::OK;
-                resp.headers_mut().insert(
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_str(&ctype)
-                        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
-                );
-                resp.headers_mut().insert(
-                    header::CONTENT_LENGTH,
-                    HeaderValue::from_str(&len.to_string()).unwrap(),
-                );
-                resp.headers_mut()
-                    .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-                // HTML 不缓存：页面里内联了 CSS 和 JS（重建后会变），
-                // 如果给长缓存，用户会一直拿到旧页面 —— 实际踩过：
-                // 改了前端里硬编码的后台端口，浏览器��用缓存里的旧地址。
-                // 静态资源（图片/字体）仍走长缓存，JS/CSS 靠 URL 上的版本号刷新。
-                let cc = if ctype.starts_with("text/html") {
-                    "no-cache, must-revalidate"
-                } else if matches_ext(target, &["js", "css"]) {
-                    // 这两个也内联/被内联进页面，同样给短缓存
-                    "no-cache, must-revalidate"
-                } else {
-                    CACHE_CONTROL
-                };
-                resp.headers_mut()
-                    .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
-                resp.headers_mut()
-                    .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
-                resp
+async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap) -> Response {
+    let Some(file) = resolve_target(root_canon, target) else {
+        return not_found();
+    };
+    let Ok(meta) = fs::metadata(&file) else {
+        return not_found();
+    };
+    let len = meta.len();
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let ctype = content_type(&file);
+    let is_html = ctype.starts_with("text/html");
+    let is_code = matches_ext(target, &["js", "css"]);
+    let etag = format!("\"{:x}-{:x}\"", len, mtime);
+
+    // 协商缓存（If-None-Match）：未修改则直接返回 304，节省网络带宽与内存分配
+    if !is_html {
+        if let Some(inm) = req_headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+            if inm.trim() == etag {
+                return Response::builder()
+                    .status(StatusCode::NOT_MODIFIED)
+                    .header(header::ETAG, etag)
+                    .header(
+                        header::CACHE_CONTROL,
+                        if is_code { "no-cache, must-revalidate" } else { CACHE_CONTROL },
+                    )
+                    .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+                    .body(Body::empty())
+                    .unwrap();
             }
-            Err(_) => not_found(),
-        },
-        None => not_found(),
+        }
+    }
+
+    match fs::read(&file) {
+        Ok(body) => {
+            let mut resp = Response::new(Body::from(body));
+            *resp.status_mut() = StatusCode::OK;
+            resp.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_str(&ctype)
+                    .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+            );
+            resp.headers_mut().insert(
+                header::CONTENT_LENGTH,
+                HeaderValue::from_str(&len.to_string()).unwrap(),
+            );
+            resp.headers_mut()
+                .insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
+            resp.headers_mut()
+                .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+
+            let cc = if is_html || is_code {
+                "no-cache, must-revalidate"
+            } else {
+                CACHE_CONTROL
+            };
+            resp.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
+            resp.headers_mut()
+                .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+            resp
+        }
+        Err(_) => not_found(),
     }
 }
 
@@ -1244,5 +1385,54 @@ fn session_cookies_ok(state: &AppState, headers: &HeaderMap) -> Option<Vec<(Stri
     match check_auth(state, headers, false) {
         Ok(c) => Some(c),
         Err(()) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify() {
+        assert_eq!(classify("Mozilla/5.0", 200), "normal");
+        assert_eq!(classify("Googlebot/2.1", 200), "crawler");
+        assert_eq!(classify("curl/8.0", 404), "scan");
+        assert_eq!(classify("curl/8.0", 503), "blocked");
+        assert_eq!(classify("curl/8.0", 429), "blocked");
+        assert_eq!(classify("curl/8.0", 401), "bruteforce");
+    }
+
+    #[test]
+    fn test_memory_thresholds() {
+        assert!(MEM_RECOVER_KB < MEM_THROTTLE_KB);
+        assert!(MEM_THROTTLE_KB < MEM_CRITICAL_KB);
+        assert!(MEM_CRITICAL_KB < MEM_EMERGENCY_KB);
+        assert_eq!(MEM_RECOVER_KB, 256 * 1024);
+        assert_eq!(MEM_THROTTLE_KB, 384 * 1024);
+        assert_eq!(MEM_EMERGENCY_KB, 480 * 1024);
+    }
+
+    #[test]
+    fn test_ip_rate_limiter() {
+        let limiter = IpRateLimiter::new();
+        let ip = "1.2.3.4";
+        // 初始正常请求
+        assert!(limiter.check_and_record(ip).is_ok());
+
+        // 模拟超过 120 次请求触发洪水限流
+        for _ in 0..125 {
+            let _ = limiter.check_and_record(ip);
+        }
+        let res = limiter.check_and_record(ip);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().0, StatusCode::TOO_MANY_REQUESTS);
+
+        // 模拟扫描探测封禁
+        let scanner_ip = "5.6.7.8";
+        for _ in 0..16 {
+            limiter.record_scan_error(scanner_ip);
+        }
+        let scan_res = limiter.check_and_record(scanner_ip);
+        assert!(scan_res.is_err());
     }
 }
