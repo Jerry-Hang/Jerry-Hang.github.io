@@ -63,13 +63,10 @@ frontend/_posts/
 └── 2026-08-24-深夜安卓Agent冒险.md    → slug: android-agent
 ```
 
-**为什么不能直接用后台的「新建文章」功能导入**：
+**关于批量导入与 Slug 说明**：
 
-服务端的 `POST /api/posts` 不支持指定 slug —— slug 由 `slugify(title)` 自动生成，
-而 `slugify` 只把空格换成 `-`，**不处理中文**。从标题「自我介绍」无法得到 `about-me`，
-会导致原来的文章链接全部失效。
-
-**因此写了个专用导入工具**（`src/bin/import_posts.rs`）：
+服务端 `POST /api/posts` 与本地命令行 `blog_server ctl new --slug <slug>` 现已支持显式指定 `slug`，且 `slugify(title)` 已支持中文 CJK 字符。
+对于既有的 Markdown 文章，使用专用导入工具（`src/bin/import_posts.rs` 或 `blog_server ctl import`）进行批量建库最为高效：
 
 ```powershell
 cd D:\3D_Work\Blog

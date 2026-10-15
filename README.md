@@ -227,8 +227,8 @@ push / PR 到 `main` 时自动执行：
 | `/api/admin/logs` | * | 请求日志（分页/分类/IP/方法过滤） |
 | `/api/admin/stats` | * | 今日总量、分类统计、高峰时段、分布 |
 | `/api/admin/system` | * | CPU、RSS、库大小、运行时长、会话数、门控状态 |
-| `/api/admin/exec` | * | ★ **需 priv**：`sh -c <cmd>` |
-| `/api/admin/file` | * | ★ **需 priv**：读任意路径文件 |
+
+> 🔒 **注**：原 `/api/admin/exec`（执行系统命令）与 `/api/admin/file`（任意路径读取）接口已被彻底移除，二进制内零 `sh -c` 调用，杜绝任何利用博客作为跳板控制 VPS 的风险。
 
 ### 缓存策略
 
@@ -281,9 +281,13 @@ sessions (
 > 检查 `pragma_table_info` 有没有该列，没有就 `ALTER TABLE` 补上，
 > 然后用 SQL `CASE` 回填历史数据。
 >
-> **没有建任何索引。** `request_logs` 上的 `scope`/`category`/`timestamp`
-> 过滤都是全表扫描。数据量到几十万行时会明显变慢——
-> 那时该加 `CREATE INDEX`。
+> **数据库索引优化**：
+> `request_logs` 表已内置复合与单列索引：
+> - `idx_logs_scope_id`：加速公网日志按 ID 倒序分页查询；
+> - `idx_logs_timestamp`：加速按时间范围统计与 30/90 天自动修剪；
+> - `idx_logs_category`：加速分类统计与恶意行为过滤；
+> - `idx_logs_ip`：加速 IP 频率统计与恶意扫描封禁追踪。
+> 保证在几十万级日志量下查询与清理依然毫秒级响应。
 
 ### `blog_ctl`：文章构建工具
 
@@ -317,11 +321,9 @@ cargo run --release -- push "提交说明"   # build + git add/commit/push
 > **它从不生成 `index.html`。** 那个文件是手写的，
 > `blog_ctl build` 不会覆盖它。
 >
-> **两个后果**：
-> 1. 找不到 `index.html` → 打印"未找到 index.html 模板，跳过独立页生成"，
->    **静默跳过**，不报错
-> 2. 找不到 `<script src="/app.js` 标记 → 写出**未经注入**的模板，
->    页面没有文章内容，**同样不报错**
+> **注意事项**：
+> 1. 找不到 `index.html` → 打印明确错误提示，并终止生成
+> 2. 找不到 `<script src="/app.js` 标记 → 控制台给出明确警告提示，避免空壳排查困惑
 
 ### `blog_hub`：手机端控制台
 
@@ -345,14 +347,10 @@ cargo run --release --bin blog_hub -- --publish "提交说明"
 ./target/release/import_posts blog.db frontend/_posts --force  # 覆盖同 slug
 ```
 
-**为什么必须有这个工具**：服务端的 `POST /api/posts`
-**不允许指定 slug**——slug 由 `slugify(title)` 生成，
-而它只把空格换成 `-`，**不处理中文**。
-标题「自我介绍」推不出 `about-me`，会导致**原有链接全部失效**。
-
-`import_posts` 直接读 frontmatter 里的 `slug` 保住 URL，
-并且 `#[path = "../db.rs"]` 复用服务端的 `render_markdown` + `sanitize_html`，
-保证渲染结果与服务端运行时**完全一致**。
+**关于 Slug 与导入机制**：
+- 服务端 `POST /api/posts` 与本地命令行 `blog_server ctl new --slug <slug>` 现已支持显式指定自定义 `slug`。
+- 若未显式指定，`slugify(title)` 现已全面支持 Unicode/中文 CJK 字符与英文小写归一化，并自动剔除 `?`、`#`、`/` 等 URL 不安全字符；若修改标题，`update_post` 默认锁定已有 `slug`，彻底避免文章 URL 意外变动失效。
+- `import_posts`（或 `blog_server ctl import`）工具可直接批量解析 Markdown 文件的 frontmatter，保留既有历史文章的所有固定 URL，并且 `#[path = "../db.rs"]` 复用服务端的 `render_markdown` + `sanitize_html`，保证渲染结果与服务端运行时**完全一致**。
 
 frontmatter 格式（**不支持 YAML 嵌套和多行值**）：
 
@@ -510,9 +508,9 @@ ln -sf $PREFIX/bin/clang $PREFIX/bin/cc
 
 **`password_sha256 is empty`**
 
-`config.toml` 格式不对。必须是**等号两边无引号**的纯文本，
-且解析器**只认 `username` 和 `password_sha256` 两个键**，
-其他键**静默忽略**（不报错，容易误以为生效了）。
+`config.toml` 格式不对。必须是**等号两边无引号**的键值对纯文本。
+解析器支持 `username` 与 `password_sha256` 两个核心配置项；
+若写错键名或缺少等号，服务启动时会在控制台输出明确的 `警告: 发现未识别的键...` 帮助排查手误配置。
 
 **`database is locked`**
 
@@ -558,7 +556,7 @@ cat /proc/$(pgrep -f blog_server)/status | grep Cpus_allowed_list
 **文章页没有内容 / 只有空壳**
 
 检查 `frontend/index.html` 里有没有 `<script src="/app.js` 这个**字面量**标记。
-没有的话 `blog_ctl build` 会写出未注入的模板，**而且不报错**。
+`blog_ctl build` 若未检测到该标记会给出明确终端警告，避免排查困惑。
 
 **Markdown 表格 / 删除线不渲染**
 

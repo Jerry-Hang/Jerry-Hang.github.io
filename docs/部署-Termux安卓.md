@@ -164,15 +164,10 @@ cd ~/blog
 完成：成功 3  跳过 0  失败 0
 ```
 
-**为什么必须用这个工具，而不是后台上传**：
+**关于文章 Slug 与 Markdown 批量导入**：
 
-服务端的 `POST /api/posts` **不允许指定 slug**——slug 由 `slugify(title)` 生成，
-而 `slugify` 只把空格换成 `-`，**不处理中文**。标题「自我介绍」推不出 `about-me`，
-结果就是**原有文章链接全部失效**。
-
-`import_posts` 直接读 frontmatter 里声明的 `slug`，保住 URL；并且它
-`#[path = "../db.rs"]` 直接复用服务端的 `render_markdown` + `sanitize_html`，
-保证**渲染和 XSS 净化结果与服务端运行时完全一致**。
+- 服务端 `POST /api/posts` 与本地命令行 `blog_server ctl new --slug <slug>` 均已支持自定义 `slug`，且 `slugify(title)` 已支持 Unicode/中文 CJK 字符；
+- `import_posts`（或 `blog_server ctl import`）能够直接批量读取 Markdown frontmatter 里声明的 `slug`，保住固定 URL，并且复用服务端的 `render_markdown` + `sanitize_html`，保证**渲染和 XSS 净化结果与服务端运行时完全一致**。
 
 加 `--force` 可以覆盖同 slug 的已有文章。
 

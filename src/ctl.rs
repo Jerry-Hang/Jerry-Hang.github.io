@@ -19,8 +19,8 @@ fn usage() {
          用法:\n  \
          blog_server ctl list\n  \
          blog_server ctl show <id|slug>\n  \
-         blog_server ctl new --title T [--file F] [--desc D] [--cats a,b] [--tags x,y]\n  \
-         blog_server ctl edit <id> [--title T] [--file F] [--desc D] [--cats a,b] [--tags x,y]\n  \
+         blog_server ctl new --title T [--slug S] [--file F] [--desc D] [--cats a,b] [--tags x,y]\n  \
+         blog_server ctl edit <id> [--title T] [--slug S] [--file F] [--desc D] [--cats a,b] [--tags x,y]\n  \
          blog_server ctl rm <id>\n  \
          blog_server ctl import <dir> [--force]\n  \
          blog_server ctl logs [--page N] [--per N] [--cat C] [--ip I] [--method M]\n  \
@@ -148,8 +148,9 @@ pub fn run(args: &[String]) {
             let desc = opt(rest, "--desc").unwrap_or_default();
             let cats = opt(rest, "--cats").map(|v| list_of(&v)).unwrap_or_default();
             let tags = opt(rest, "--tags").map(|v| list_of(&v)).unwrap_or_default();
+            let slug = opt(rest, "--slug");
             let db = open_db();
-            match db.create_post(&title, &content, cats, tags, &desc) {
+            match db.create_post(&title, &content, cats, tags, &desc, slug.as_deref()) {
                 Ok(p) => println!("已创建 #{} slug={} title={}", p.id, p.slug, p.title),
                 Err(e) => {
                     eprintln!("创建失败: {e}");
@@ -172,6 +173,7 @@ pub fn run(args: &[String]) {
                 }
             };
             let title = opt(rest, "--title").unwrap_or(cur.title.clone());
+            let slug = opt(rest, "--slug");
             let content = if opt(rest, "--file").is_some() {
                 match read_content(rest) {
                     Ok(c) => c,
@@ -186,7 +188,7 @@ pub fn run(args: &[String]) {
             let desc = opt(rest, "--desc").unwrap_or(cur.desc.clone());
             let cats = opt(rest, "--cats").map(|v| list_of(&v)).unwrap_or(cur.categories.clone());
             let tags = opt(rest, "--tags").map(|v| list_of(&v)).unwrap_or(cur.tags.clone());
-            match db.update_post(cur.id, &title, &content, cats, tags, &desc) {
+            match db.update_post(cur.id, &title, &content, cats, tags, &desc, slug.as_deref()) {
                 Ok(p) => println!("已更新 #{} slug={} title={}", p.id, p.slug, p.title),
                 Err(e) => {
                     eprintln!("更新失败: {e}");

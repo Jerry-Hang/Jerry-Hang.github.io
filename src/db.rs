@@ -219,24 +219,29 @@ fn tokenize_attrs(s: &str) -> Vec<(String, String)> {
     out
 }
 
-fn slugify(s: &str) -> String {
+pub fn slugify(s: &str) -> String {
     let mut out = String::new();
-    let mut prev_space = false;
+    let mut prev_dash = false;
     for ch in s.trim().chars() {
-        if ch.is_whitespace() {
-            if !prev_space && !out.is_empty() {
-                out.push('-');
+        if ch.is_alphanumeric() {
+            if ch.is_ascii_alphabetic() {
+                out.push(ch.to_ascii_lowercase());
+            } else {
+                out.push(ch);
             }
-            prev_space = true;
-        } else {
-            out.push(ch);
-            prev_space = false;
+            prev_dash = false;
+        } else if ch == '-' || ch == '_' || ch.is_whitespace() {
+            if !prev_dash && !out.is_empty() {
+                out.push('-');
+                prev_dash = true;
+            }
         }
     }
-    if out.is_empty() {
+    let res = out.trim_matches('-').to_string();
+    if res.is_empty() {
         "post".to_string()
     } else {
-        out.trim_end_matches('-').to_string()
+        res
     }
 }
 
@@ -385,7 +390,11 @@ impl Db {
                token TEXT PRIMARY KEY,\
                tier TEXT NOT NULL,\
                expires_at INTEGER NOT NULL\
-             );",
+             );\
+             CREATE INDEX IF NOT EXISTS idx_logs_scope_id ON request_logs(scope, id DESC);\
+             CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON request_logs(timestamp);\
+             CREATE INDEX IF NOT EXISTS idx_logs_category ON request_logs(category);\
+             CREATE INDEX IF NOT EXISTS idx_logs_ip ON request_logs(ip);",
         )
         .map_err(|e| e.to_string())?;
 
@@ -519,7 +528,15 @@ impl Db {
             .ok()
     }
 
-    pub fn create_post(&self, title: &str, content_md: &str, categories: Vec<String>, tags: Vec<String>, desc: &str) -> Result<Post, String> {
+    pub fn create_post(
+        &self,
+        title: &str,
+        content_md: &str,
+        categories: Vec<String>,
+        tags: Vec<String>,
+        desc: &str,
+        slug_opt: Option<&str>,
+    ) -> Result<Post, String> {
         let content_html = render_markdown(content_md);
         let desc = if desc.trim().is_empty() {
             content_md.trim().lines().find(|l| !l.trim().is_empty()).unwrap_or("").chars().take(80).collect()
@@ -527,7 +544,11 @@ impl Db {
             desc.to_string()
         };
         let conn = self.conn.lock().unwrap();
-        let slug = unique_slug(&conn, title, None);
+        let base_candidate = match slug_opt {
+            Some(s) if !s.trim().is_empty() => s.trim(),
+            _ => title,
+        };
+        let slug = unique_slug(&conn, base_candidate, None);
         let cats = serde_json::to_string(&categories).unwrap_or_else(|_| "[]".to_string());
         let tagstr = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
         conn.execute(
@@ -540,7 +561,16 @@ impl Db {
         self.get_by_id(id).ok_or_else(|| "post not found".to_string())
     }
 
-    pub fn update_post(&self, id: i64, title: &str, content_md: &str, categories: Vec<String>, tags: Vec<String>, desc: &str) -> Result<Post, String> {
+    pub fn update_post(
+        &self,
+        id: i64,
+        title: &str,
+        content_md: &str,
+        categories: Vec<String>,
+        tags: Vec<String>,
+        desc: &str,
+        slug_opt: Option<&str>,
+    ) -> Result<Post, String> {
         let content_html = render_markdown(content_md);
         let desc = if desc.trim().is_empty() {
             content_md.trim().lines().find(|l| !l.trim().is_empty()).unwrap_or("").chars().take(80).collect()
@@ -548,13 +578,18 @@ impl Db {
             desc.to_string()
         };
         let conn = self.conn.lock().unwrap();
-        let exists: i64 = conn
-            .query_row("SELECT COUNT(*) FROM posts WHERE id=?1", params![id], |r| r.get(0))
-            .unwrap_or(0);
-        if exists == 0 {
-            return Err("post not found".to_string());
-        }
-        let slug = unique_slug(&conn, title, Some(id));
+        let existing_slug: Option<String> = conn
+            .query_row("SELECT slug FROM posts WHERE id=?1", params![id], |r| r.get(0))
+            .ok();
+        let old_slug = match existing_slug {
+            Some(s) => s,
+            None => return Err("post not found".to_string()),
+        };
+        // 若调用方显式指定了新 slug 则更新并去重；否则保持原 slug，避免修改标题导致外链失效
+        let slug = match slug_opt {
+            Some(s) if !s.trim().is_empty() => unique_slug(&conn, s.trim(), Some(id)),
+            _ => old_slug,
+        };
         let cats = serde_json::to_string(&categories).unwrap_or_else(|_| "[]".to_string());
         let tagstr = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
         conn.execute(
@@ -838,3 +873,38 @@ impl Db {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slugify() {
+        assert_eq!(slugify("Hello World"), "hello-world");
+        assert_eq!(slugify("  Hello   World  "), "hello-world");
+        assert_eq!(slugify("自我介绍"), "自我介绍");
+        assert_eq!(slugify("Jerry-Hang 的自述史 (2026)"), "jerry-hang-的自述史-2026");
+        assert_eq!(slugify("What is Rust?"), "what-is-rust");
+        assert_eq!(slugify("a / b \\ c # d ? e & f % g"), "a-b-c-d-e-f-g");
+        assert_eq!(slugify("???!!!"), "post");
+        assert_eq!(slugify("   "), "post");
+    }
+
+    #[test]
+    fn test_db_indexes_created() {
+        let dir = std::env::temp_dir().join(format!("blog_test_{}.db", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let db = Db::open(&dir).expect("open db");
+        let conn = db.conn.lock().unwrap();
+        let idx_count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='index' AND tbl_name='request_logs' AND name IN ('idx_logs_scope_id', 'idx_logs_timestamp', 'idx_logs_category', 'idx_logs_ip')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        assert_eq!(idx_count, 4, "expected 4 indexes on request_logs");
+        drop(conn);
+        let _ = std::fs::remove_file(&dir);
+    }
+}
+
