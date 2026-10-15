@@ -210,17 +210,29 @@ pub fn load_config(path: &str, root: PathBuf) -> Result<Config, String> {
     let content = fs::read_to_string(path).map_err(|e| format!("cannot read config {path}: {e}"))?;
     let mut username = DEFAULT_USERNAME.to_string();
     let mut password_sha256 = String::new();
-    for line in content.lines() {
+    for (line_no, line) in content.lines().enumerate() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         if let Some((k, v)) = line.split_once('=') {
-            match k.trim() {
-                "username" => username = v.trim().to_string(),
-                "password_sha256" => password_sha256 = v.trim().to_string(),
-                _ => {}
+            let key = k.trim();
+            let val = v.trim();
+            match key {
+                "username" => username = val.to_string(),
+                "password_sha256" => password_sha256 = val.to_string(),
+                other => {
+                    eprintln!(
+                        "警告: 配置文件 {path}:{} 发现未识别的键 '{other}'（目前仅支持 username 和 password_sha256），该行已被忽略",
+                        line_no + 1
+                    );
+                }
             }
+        } else {
+            eprintln!(
+                "警告: 配置文件 {path}:{} 格式无效（缺少 '=' 键值分隔符）：'{line}'",
+                line_no + 1
+            );
         }
     }
     if password_sha256.is_empty() {
@@ -818,7 +830,8 @@ async fn handle_api(state: &Arc<AppState>, method: &Method, path: &str, req: Req
                 let cats = to_str_vec(&v["categories"]);
                 let tags = to_str_vec(&v["tags"]);
                 let desc = v["desc"].as_str().unwrap_or("").to_string();
-                match state.db.create_post(&title, &content, cats, tags, &desc) {
+                let slug_opt = v["slug"].as_str();
+                match state.db.create_post(&title, &content, cats, tags, &desc, slug_opt) {
                     Ok(p) => json_response(StatusCode::OK, post_json(&p)),
                     Err(e) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": e})),
                 }
@@ -835,7 +848,8 @@ async fn handle_api(state: &Arc<AppState>, method: &Method, path: &str, req: Req
                 let cats = to_str_vec(&v["categories"]);
                 let tags = to_str_vec(&v["tags"]);
                 let desc = v["desc"].as_str().unwrap_or("").to_string();
-                match state.db.update_post(id, &title, &content, cats, tags, &desc) {
+                let slug_opt = v["slug"].as_str();
+                match state.db.update_post(id, &title, &content, cats, tags, &desc, slug_opt) {
                     Ok(p) => json_response(StatusCode::OK, post_json(&p)),
                     Err(e) => json_response(StatusCode::NOT_FOUND, json!({"error": e})),
                 }
