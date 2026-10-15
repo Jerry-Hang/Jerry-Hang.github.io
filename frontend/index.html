@@ -362,7 +362,7 @@ button:focus:not(:focus-visible) { outline: none; }
 
 /* 回到顶部 + Toast */
 #back-top {
-  position: fixed; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 70;
+  position: fixed; right: 18px; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 900 !important;
   width: 44px; height: 44px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-soft);
@@ -371,6 +371,7 @@ button:focus:not(:focus-visible) { outline: none; }
   -webkit-backdrop-filter: blur(18px) saturate(1.6);
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow-m);
+  cursor: pointer;
   opacity: 0; pointer-events: none; transform: translateY(8px);
   transition: opacity .25s ease, transform .25s ease, color .18s ease, background .18s ease;
 }
@@ -3088,24 +3089,28 @@ body:not(.dark) .act-btn {
   margin: 0 auto !important;
   padding: 24px 20px 60px !important;
 }
+/* 取消最底层毛玻璃，让作者卡片与简介主卡片作为独立玻璃卡片浮动在壁纸上 */
+#view-about .about-card,
+.about-card#about-body,
 .about-card {
-  border-radius: 20px !important;
-  background: var(--card) !important;
-  border: 1px solid var(--card-border) !important;
-  box-shadow: var(--shadow-m) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  padding: 32px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+  transform: none !important;
 }
 .about-layout {
   display: grid !important;
   grid-template-columns: 280px 1fr !important;
-  gap: 36px !important;
+  gap: 28px !important;
+  align-items: start !important;
 }
 @media (max-width: 768px) {
   .about-layout {
     grid-template-columns: 1fr !important;
-    gap: 24px !important;
+    gap: 18px !important;
   }
 }
 .about-side {
@@ -3113,6 +3118,28 @@ body:not(.dark) .act-btn {
   flex-direction: column !important;
   align-items: center !important;
   text-align: center !important;
+  background: rgba(28, 28, 30, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35) !important;
+  padding: 26px 20px !important;
+}
+.about-main {
+  background: rgba(28, 28, 30, 0.75) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35) !important;
+  padding: 28px 24px !important;
+}
+body:not(.dark) .about-side,
+body:not(.dark) .about-main {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 32px rgba(30, 41, 59, 0.12) !important;
 }
 .about-side .avatar {
   width: 96px !important;
@@ -3360,10 +3387,16 @@ body:not(.dark) .wall-thumb.clean {
     padding: 16px 12px 48px !important;
   }
   .about-card {
-    padding: 20px 14px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
   }
+  .about-side,
   .about-main {
-    padding: 16px 12px !important;
+    padding: 20px 14px !important;
+    border-radius: 18px !important;
   }
   .wall-grid {
     display: grid !important;
@@ -3428,10 +3461,9 @@ body:not(.dark) .wall-thumb.clean {
 window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,.taskbar,.top-bar,#taskbar,#menubar').forEach(function(e){e.classList.toggle('scrolled',window.scrollY>10)});});
 </script><!--ADMIN_LINK_START--><!--ADMIN_LINK_END--><script>window.addEventListener('DOMContentLoaded',function(){var tb=document.getElementById('topbar');if(tb&&typeof toggleSidebar==='function'){var b=document.createElement('button');b.type='button';b.className='icon-btn tb-menu';b.setAttribute('aria-label','打开目录');b.textContent='☰';b.addEventListener('click',function(e){e.preventDefault();toggleSidebar(true);});tb.insertBefore(b,tb.firstChild);}});</script>
 
-<!-- 阅读增强所需的元素（进度条 / 图片灯箱 / 回到顶部） -->
+<!-- 阅读增强所需的元素（进度条 / 图片灯箱） -->
 <div id="read-progress" aria-hidden="true"></div>
 <div id="lightbox" role="dialog" aria-modal="true" aria-label="图片查看"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"></div>
-<button id="to-top" type="button" aria-label="回到顶部" title="回到顶部">↑</button>
 
 </body>
 </html>

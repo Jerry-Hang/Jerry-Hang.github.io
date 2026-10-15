@@ -1164,18 +1164,20 @@ function openFromHashIfAny() {
   const bar = document.getElementById("progress-bar");
   let show = false;
   window.addEventListener("scroll", () => {
-    const s = window.scrollY > 480;
-    if (s !== show) { show = s; btn.classList.toggle("show", s); }
+    const s = window.scrollY > 300;
+    if (s !== show) { show = s; if (btn) btn.classList.toggle("show", s); }
     const doc = document.documentElement;
     const max = doc.scrollHeight - window.innerHeight;
-    if (max > 0 && document.body.classList.contains("reading")) {
-      bar.style.width = Math.min(100, (window.scrollY / max) * 100).toFixed(2) + "%";
-      bar.classList.add("show");
-    } else {
-      bar.classList.remove("show");
+    if (bar) {
+      if (max > 0 && document.body.classList.contains("reading")) {
+        bar.style.width = Math.min(100, (window.scrollY / max) * 100).toFixed(2) + "%";
+        bar.classList.add("show");
+      } else {
+        bar.classList.remove("show");
+      }
     }
   }, { passive: true });
-  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  if (btn) btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 })();
 
 /* 滚动收缩：顶部横条 → 悬浮胶囊（平滑过渡） */
