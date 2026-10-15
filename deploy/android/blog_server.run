@@ -5,7 +5,7 @@ export BLOG_WORKERS="${BLOG_WORKERS:-4}"
 export BLOG_CPUS="${BLOG_CPUS:-0-3}"
 export BLOG_MAX_CONCURRENT="${BLOG_MAX_CONCURRENT:-2400}"
 export BLOG_EXT_ADDR="0.0.0.0:8080"
-export BLOG_LOCAL_ADDR="127.0.0.1:8081"
+export BLOG_LOCAL_ADDR="${BLOG_LOCAL_ADDR:-none}"
 export BLOG_ROOT="${BLOG_ROOT:-$PWD/frontend}"
 export BLOG_DB="${BLOG_DB:-$PWD/blog.db}"
 termux-wake-lock || true
