@@ -104,7 +104,10 @@ loopback and useless for this purpose.
   **best-effort**: on failure it warns on stderr and continues.
 
 ### UI & Interactivity
-
+ 
+- **Swiss Style & Typography Discipline**: Rooted in International Typographic Style principles: strict grid layout, high-contrast hierarchical hierarchy, refined Neo-Grotesque font stacks (`-apple-system, "Helvetica Neue", Arial`), and disciplined negative space, eliminating tacky "AI template" aesthetics.
+- **Emoji-Free & Clean Vector Iconography**: Complete elimination of unicode emojis, rainbow neon glows, and distracting badges; replaced with restrained 1.5px hairline vector SVGs and pure typographic feedback.
+- **Native iOS Frosted Glass Visuals**: Multi-layered `backdrop-filter: blur(28px)`, specular hairlines, and floating capsule navigation with smooth micro-damped transitions, combining clarity with tactile warmth on both mobile and desktop.
 - **Global Instant Search (Command Palette)**: Press `Ctrl+K` / `Cmd+K` or click the search icon in the topbar to open the search modal. Fast client-side fuzzy search across titles, summaries, tags, categories, and article body snippets with keyword highlighting and arrow-key/Enter navigation.
 - **Blogroll / Friendly Links**: Dedicated Friends tab displaying responsive card grid of peer blogs, avatars, and one-click copy feedback for site exchange info.
 - **Code Block One-Click Copy**: Integrated copy button on code blocks with animated checkmark feedback.
