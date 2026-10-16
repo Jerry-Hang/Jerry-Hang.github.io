@@ -588,7 +588,7 @@ function renderHome() {
           '<span>' + esc(hero.date || "") + '</span>' +
           '<span>' + esc(SITE.author) + '</span>' +
           '<span>' + words.toLocaleString() + ' 字 · 约 ' + readMinutes(hero) + ' 分钟</span>' +
-          '<span class="hc-read">阅读全文 ›</span>' +
+          '<span class="hc-read">阅读全文</span>' +
         '</div>' +
       '</div>';
     heroBox.onclick = () => selectArticle(idx);
@@ -619,7 +619,7 @@ function renderHome() {
           '<span class="hi-title">' + esc(p.title) + '</span>' +
           (p.desc ? '<span class="hi-excerpt">' + esc(p.desc) + '</span>' : '') +
           '<span class="hi-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字 · ' + readMinutes(p) + ' 分钟</span>' +
-            '<span class="hi-arrow">继续阅读 ›</span>' +
+            '<span class="hi-arrow">阅读全文</span>' +
           '</span>' +
         '</span>' +
       '</button>';
@@ -634,11 +634,11 @@ function renderHome() {
     pager.innerHTML = "";
   } else {
     pager.innerHTML =
-      '<button class="pg-btn" id="pg-prev" ' + (state.pinnedPage <= 1 ? "disabled" : "") + '>‹ 上一页</button>' +
+      '<button class="pg-btn" id="pg-prev" ' + (state.pinnedPage <= 1 ? "disabled" : "") + '>上一页</button>' +
       '<span class="pg-info">第 <b>' + state.pinnedPage + '</b> / ' + pages + ' 页</span>' +
       '<input class="pg-input" id="pg-input" type="number" min="1" max="' + pages + '" value="' + state.pinnedPage + '" aria-label="页码">' +
       '<button class="pg-btn" id="pg-go">前往</button>' +
-      '<button class="pg-btn" id="pg-next" ' + (state.pinnedPage >= pages ? "disabled" : "") + '>下一页 ›</button>';
+      '<button class="pg-btn" id="pg-next" ' + (state.pinnedPage >= pages ? "disabled" : "") + '>下一页</button>';
     document.getElementById("pg-prev").addEventListener("click", () => { state.pinnedPage--; renderHome(); });
     document.getElementById("pg-next").addEventListener("click", () => { state.pinnedPage++; renderHome(); });
     document.getElementById("pg-go").addEventListener("click", () => {
@@ -685,17 +685,17 @@ function openArticle(idx) {
   document.getElementById("r-foot").innerHTML =
     '<div class="r-foot-pagers">' +
       '<button class="pn-btn pn-prev' + (prev ? "" : " disabled") + '" id="r-prev" title="' + (prev ? esc(prev.title) : "") + '">' +
-        '<span class="pn-arrow">‹</span>' +
+        '<svg class="pn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>' +
         '<span class="pn-text"><small>上一篇</small><b>' + (prev ? esc(prev.title) : "已是最早") + '</b></span>' +
       '</button>' +
       '<button class="pn-btn pn-next' + (next ? "" : " disabled") + '" id="r-next" title="' + (next ? esc(next.title) : "") + '">' +
         '<span class="pn-text"><small>下一篇</small><b>' + (next ? esc(next.title) : "已是最新") + '</b></span>' +
-        '<span class="pn-arrow">›</span>' +
+        '<svg class="pn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>' +
       '</button>' +
     '</div>' +
     '<div class="r-foot-actions">' +
-      '<button class="act-btn" id="r-back"><span class="act-icon">🏠</span><span>返回主页</span></button>' +
-      '<button class="act-btn" id="r-copy"><span class="act-icon">🔗</span><span>复制链接</span></button>' +
+      '<button class="act-btn" id="r-back"><svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="15 18 9 12 15 6"/><line x1="9" y1="12" x2="20" y2="12"/></svg><span>返回主页</span></button>' +
+      '<button class="act-btn" id="r-copy"><svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制链接</span></button>' +
     '</div>';
   document.getElementById("r-copy").addEventListener("click", copyPageLink);
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
@@ -902,7 +902,7 @@ function renderToc(mdBody, outline) {
   if (isMobile) box.classList.add("collapsed"); else box.classList.remove("collapsed");
   box.innerHTML =
     '<div class="toc-head" role="button" tabindex="0" aria-expanded="' + (!isMobile) + '">' +
-      '<span>本文目录</span><span class="toc-icon">▾</span>' +
+      '<span>本文目录</span><svg class="toc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>' +
     '</div><ol>' +
     items.map(x =>
       '<li><a href="#' + esc(x.id) + '" class="lv-' + x.level + '" data-target="' + esc(x.id) + '">' +
@@ -1052,7 +1052,7 @@ function renderFriends() {
       '<div class="friend-info">' +
         '<div class="friend-name-row">' +
           '<span class="friend-name">' + esc(f.name) + '</span>' +
-          '<span class="friend-arrow">↗</span>' +
+          '<svg class="friend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>' +
         '</div>' +
         '<p class="friend-desc">' + esc(f.bio) + '</p>' +
         (tagsHtml ? '<div class="friend-tags">' + tagsHtml + '</div>' : '') +
@@ -1143,7 +1143,7 @@ function runSearch(query) {
     searchMatches = state.posts.slice(0, 5);
     searchActiveIdx = -1;
     if (countBox) countBox.textContent = "全站共 " + state.posts.length + " 篇文章";
-    resultsBox.innerHTML = '<div class="sm-section-label">推荐阅读</div>' +
+    resultsBox.innerHTML = '<div class="sm-section-label">RECOMMENDED / 推荐阅读</div>' +
       searchMatches.map((p, idx) => renderSearchItem(p, idx, "")).join("");
     bindSearchItemClicks();
     return;
@@ -1178,7 +1178,7 @@ function runSearch(query) {
   if (countBox) countBox.textContent = "找到 " + searchMatches.length + " 篇相关文章";
 
   if (!searchMatches.length) {
-    resultsBox.innerHTML = '<div class="sm-empty"><div class="sm-empty-icon">🔍</div><div>未找到关于 “<b>' + esc(query) + '</b>” 的相关文章</div></div>';
+    resultsBox.innerHTML = '<div class="sm-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="28" height="28" style="opacity:.3;margin-bottom:8px;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><div>未找到关于 “<b>' + esc(query) + '</b>” 的相关文章</div></div>';
     return;
   }
 
