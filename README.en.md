@@ -103,6 +103,14 @@ loopback and useless for this purpose.
   Linux/Android or `SetProcessAffinityMask` on Windows. Strictly
   **best-effort**: on failure it warns on stderr and continues.
 
+### UI & Interactivity
+
+- **Global Instant Search (Command Palette)**: Press `Ctrl+K` / `Cmd+K` or click the search icon in the topbar to open the search modal. Fast client-side fuzzy search across titles, summaries, tags, categories, and article body snippets with keyword highlighting and arrow-key/Enter navigation.
+- **Blogroll / Friendly Links**: Dedicated Friends tab displaying responsive card grid of peer blogs, avatars, and one-click copy feedback for site exchange info.
+- **Code Block One-Click Copy**: Integrated copy button on code blocks with animated checkmark feedback.
+- **Reading Enhancement & TOC**: Real-time reading progress bar, word count, estimated reading time, sticky table-of-contents outline, and prev/next article navigation cards.
+- **Zero External Dependencies**: Pure vanilla HTML5/CSS3/JavaScript, zero CDN requests, zero analytics tracking, total privacy and resilience.
+
 ### Minimal dependencies
 
 Implemented from scratch on the standard library:

@@ -11,6 +11,38 @@ const esc = s => String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"
 
 const SITE = { title: "JerryHang 的个人博客", author: "JerryHang", repo: "https://github.com/Jerry-Hang/Jerry-Hang.github.io" };
 
+/* 友链列表（精选推荐与朋友们） */
+const FRIENDS = [
+  {
+    name: "Eric-Terminal",
+    url: "https://blog.ericterminal.com",
+    avatar: "https://github.com/Eric-Terminal.png",
+    bio: "专注于现代前端技术与全栈折腾，cf-astro-blog 作者。",
+    tags: ["前端", "Astro", "开源"]
+  },
+  {
+    name: "Rust 官方社区",
+    url: "https://www.rust-lang.org",
+    avatar: "/assets/avatar.jpg",
+    bio: "一门赋予每个人构建可靠且高效软件能力的现代系统级编程语言。",
+    tags: ["Rust", "系统编程", "高性能"]
+  },
+  {
+    name: "MDN Web Docs",
+    url: "https://developer.mozilla.org",
+    avatar: "/assets/avatar.jpg",
+    bio: "面向全球 Web 开发者的权威开放文档库与现代网络技术标准。",
+    tags: ["Web", "文档", "标准"]
+  },
+  {
+    name: "JerryHang's GitHub",
+    url: "https://github.com/Jerry-Hang",
+    avatar: "/assets/avatar.jpg",
+    bio: "开源探索与技术实验项目沉淀，记录每一次折腾与突破。",
+    tags: ["开源", "个人主页", "折腾"]
+  }
+];
+
 /* 壁纸按方向区分：横版壁纸（桌面/平板/横屏）与竖版壁纸（手机竖屏） */
 const WALLS = [
   { id: "clean", name: "纯色", img: "", orient: "any" },
@@ -427,18 +459,19 @@ function renderSide() {
 
 /* ---------- 视图 ---------- */
 function showView(name) {
+  $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   const doIt = () => {
     if (name !== "reader") { try { history.replaceState(null, "", "/"); } catch (e) { /* 忽略 */ } }
     $$(".view").forEach(v => v.classList.remove("on"));
     const v = document.getElementById("view-" + name);
     if (v) v.classList.add("on");
-  $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
-  document.body.classList.toggle("reading", name === "reader");
-  // 全局保持个性化背景一致
-  document.body.classList.toggle("home-bg", true);
-  state.nav = name;
-  if (name !== "reader") { state.sideView = "posts"; renderSide(); }
-  if (window.innerWidth <= 720) toggleSidebar(false);
+    $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+    document.body.classList.toggle("reading", name === "reader");
+    // 全局保持个性化背景一致
+    document.body.classList.toggle("home-bg", true);
+    state.nav = name;
+    if (name !== "reader") { state.sideView = "posts"; renderSide(); }
+    if (window.innerWidth <= 720) toggleSidebar(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   if (document.startViewTransition) {
@@ -634,8 +667,10 @@ function openArticle(idx) {
   mdBody.innerHTML = mdToHtml(p.body);
   mdBody.querySelectorAll("pre").forEach(pre => {
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "code-copy";
-    b.textContent = "复制";
+    b.setAttribute("aria-label", "复制代码");
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制</span>';
     pre.appendChild(b);
   });
   applyFontScale();
@@ -825,7 +860,8 @@ function enhanceArticle(mdBody, outline) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "code-copy";
-      b.textContent = "复制";
+      b.setAttribute("aria-label", "复制代码");
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制</span>';
       pre.appendChild(b);
     }
   });
@@ -1001,6 +1037,206 @@ function renderArchive() {
   $$("#arch-body .arch-item").forEach(b => b.addEventListener("click", () => selectArticle(Number(b.dataset.idx))));
 }
 
+/* ---------- 友链 ---------- */
+function renderFriends() {
+  const grid = document.getElementById("friends-grid");
+  if (!grid) return;
+  grid.innerHTML = FRIENDS.map(f => {
+    const initial = (f.name || "?").trim().charAt(0).toUpperCase();
+    const tagsHtml = (f.tags || []).map(t => '<span class="friend-tag">' + esc(t) + '</span>').join("");
+    return '<a class="friend-card" href="' + esc(f.url) + '" target="_blank" rel="noopener noreferrer">' +
+      '<div class="friend-avatar-wrap">' +
+        '<img class="friend-avatar" src="' + esc(f.avatar) + '" alt="' + esc(f.name) + '" loading="lazy" onerror="this.style.display=\'none\';if(this.nextElementSibling)this.nextElementSibling.style.display=\'flex\';">' +
+        '<div class="friend-fallback-avatar" style="display:none;">' + esc(initial) + '</div>' +
+      '</div>' +
+      '<div class="friend-info">' +
+        '<div class="friend-name-row">' +
+          '<span class="friend-name">' + esc(f.name) + '</span>' +
+          '<span class="friend-arrow">↗</span>' +
+        '</div>' +
+        '<p class="friend-desc">' + esc(f.bio) + '</p>' +
+        (tagsHtml ? '<div class="friend-tags">' + tagsHtml + '</div>' : '') +
+      '</div>' +
+    '</a>';
+  }).join("");
+
+  const copyBtn = document.getElementById("copy-my-info");
+  if (copyBtn && !copyBtn.dataset.bound) {
+    copyBtn.dataset.bound = "1";
+    copyBtn.addEventListener("click", () => {
+      const info = "博客名称：JerryHang 的个人博客\n博客网址：https://jerry-hang.blog\n博客简介：记录与折腾 · 纯静态轻量博客\n博客头像：https://jerry-hang.blog/assets/avatar.jpg";
+      const notify = () => showToast("本站信息已复制");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(info).then(notify).catch(() => fallbackCopy(info, notify));
+      } else {
+        fallbackCopy(info, notify);
+      }
+    });
+  }
+}
+
+/* ---------- 全局命令搜索浮层 (Ctrl+K / Cmd+K) ---------- */
+let searchActiveIdx = -1;
+let searchMatches = [];
+
+function openSearchModal() {
+  const modal = document.getElementById("search-modal");
+  const input = document.getElementById("sm-input");
+  if (!modal || !input) return;
+  modal.removeAttribute("hidden");
+  modal.classList.add("open");
+  input.focus();
+  input.select();
+  runSearch(input.value.trim());
+  document.body.style.overflow = "hidden";
+}
+
+function closeSearchModal() {
+  const modal = document.getElementById("search-modal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  setTimeout(() => {
+    modal.setAttribute("hidden", "");
+    document.body.style.overflow = "";
+  }, 200);
+}
+
+function highlightText(text, query) {
+  if (!query) return esc(text);
+  const escapedText = esc(text);
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return escapedText;
+  const regex = new RegExp("(" + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+  return escapedText.replace(regex, '<mark class="sm-highlight">$1</mark>');
+}
+
+function getSnippet(body, query, maxLen) {
+  const limit = maxLen || 110;
+  const plain = (body || "")
+    .replace(/^#+\s.*$/gm, "")
+    .replace(/[*_`>\[\]()!#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!query) return plain.slice(0, limit) + (plain.length > limit ? "…" : "");
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  let bestIdx = -1;
+  const lower = plain.toLowerCase();
+  for (const t of terms) {
+    const idx = lower.indexOf(t);
+    if (idx >= 0 && (bestIdx === -1 || idx < bestIdx)) bestIdx = idx;
+  }
+  if (bestIdx === -1) return plain.slice(0, limit) + (plain.length > limit ? "…" : "");
+  const start = Math.max(0, bestIdx - 20);
+  const end = Math.min(plain.length, start + limit);
+  return (start > 0 ? "…" : "") + plain.slice(start, end) + (end < plain.length ? "…" : "");
+}
+
+function runSearch(query) {
+  const resultsBox = document.getElementById("sm-results");
+  const countBox = document.getElementById("sm-count");
+  const clearBtn = document.getElementById("sm-clear");
+  if (!resultsBox) return;
+  if (clearBtn) clearBtn.hidden = !query;
+
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) {
+    searchMatches = state.posts.slice(0, 5);
+    searchActiveIdx = -1;
+    if (countBox) countBox.textContent = "全站共 " + state.posts.length + " 篇文章";
+    resultsBox.innerHTML = '<div class="sm-section-label">推荐阅读</div>' +
+      searchMatches.map((p, idx) => renderSearchItem(p, idx, "")).join("");
+    bindSearchItemClicks();
+    return;
+  }
+
+  const scored = [];
+  state.posts.forEach(p => {
+    let score = 0;
+    const titleL = (p.title || "").toLowerCase();
+    const descL = (p.desc || "").toLowerCase();
+    const bodyL = (p.body || "").toLowerCase();
+    const tagsL = (p.tags || []).map(t => t.toLowerCase()).join(" ");
+    const catsL = (p.categories || []).map(c => c.toLowerCase()).join(" ");
+
+    let allMatched = true;
+    for (const t of terms) {
+      let termMatched = false;
+      if (titleL.includes(t)) { score += 20; termMatched = true; }
+      if (tagsL.includes(t)) { score += 10; termMatched = true; }
+      if (catsL.includes(t)) { score += 8; termMatched = true; }
+      if (descL.includes(t)) { score += 6; termMatched = true; }
+      if (bodyL.includes(t)) { score += 3; termMatched = true; }
+      if (!termMatched) allMatched = false;
+    }
+    if (allMatched && score > 0) scored.push({ post: p, score });
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  searchMatches = scored.map(x => x.post);
+  searchActiveIdx = searchMatches.length ? 0 : -1;
+
+  if (countBox) countBox.textContent = "找到 " + searchMatches.length + " 篇相关文章";
+
+  if (!searchMatches.length) {
+    resultsBox.innerHTML = '<div class="sm-empty"><div class="sm-empty-icon">🔍</div><div>未找到关于 “<b>' + esc(query) + '</b>” 的相关文章</div></div>';
+    return;
+  }
+
+  resultsBox.innerHTML = searchMatches.map((p, idx) => renderSearchItem(p, idx, query)).join("");
+  bindSearchItemClicks();
+  updateSearchActive();
+}
+
+function renderSearchItem(p, idx, query) {
+  const cat = (p.categories && p.categories[0]) || "";
+  const snippet = getSnippet(p.body || p.desc, query, 110);
+  const activeCls = idx === searchActiveIdx ? " active" : "";
+  return '<button class="sm-item' + activeCls + '" data-sidx="' + idx + '">' +
+    '<div class="sm-item-head">' +
+      '<span class="sm-item-title">' + highlightText(p.title, query) + '</span>' +
+      '<span class="sm-item-date">' + esc(p.date || "") + '</span>' +
+    '</div>' +
+    '<div class="sm-item-snippet">' + highlightText(snippet, query) + '</div>' +
+    (cat ? '<div class="sm-item-meta"><span class="sm-item-cat">' + esc(cat) + '</span></div>' : '') +
+  '</button>';
+}
+
+function bindSearchItemClicks() {
+  $$("#sm-results .sm-item").forEach(b => {
+    b.addEventListener("click", () => {
+      const idx = Number(b.dataset.sidx);
+      const post = searchMatches[idx];
+      if (post) {
+        const postIdx = state.posts.indexOf(post);
+        if (postIdx >= 0) selectArticle(postIdx);
+      }
+      closeSearchModal();
+    });
+    b.addEventListener("mouseenter", () => {
+      searchActiveIdx = Number(b.dataset.sidx);
+      updateSearchActive();
+    });
+  });
+}
+
+function updateSearchActive() {
+  const items = $$("#sm-results .sm-item");
+  items.forEach((item, i) => {
+    const isAct = i === searchActiveIdx;
+    item.classList.toggle("active", isAct);
+    if (isAct) item.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+
+function fallbackCopy(text, cb) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); if (cb) cb(); } catch (e) { showToast("复制失败"); }
+  document.body.removeChild(ta);
+}
+
 /* ---------- 关于 ---------- */
 function renderAbout() {
   const tagsAll = new Set();
@@ -1087,6 +1323,7 @@ function renderAll() {
   renderSide();
   renderHome();
   renderArchive();
+  renderFriends();
   renderAbout();
 }
 
@@ -1096,9 +1333,32 @@ document.getElementById("side-grip").addEventListener("click", () => toggleSideb
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
 document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderSide(); });
+
+const searchBtn = document.getElementById("tb-search");
+if (searchBtn) searchBtn.addEventListener("click", openSearchModal);
+const smBackdrop = document.getElementById("sm-backdrop");
+if (smBackdrop) smBackdrop.addEventListener("click", closeSearchModal);
+const smClear = document.getElementById("sm-clear");
+if (smClear) smClear.addEventListener("click", () => {
+  const input = document.getElementById("sm-input");
+  if (input) { input.value = ""; input.focus(); runSearch(""); }
+});
+const smInput = document.getElementById("sm-input");
+if (smInput) {
+  smInput.addEventListener("input", e => runSearch(e.target.value.trim()));
+}
+const scArchive = document.getElementById("sc-archive");
+if (scArchive) {
+  scArchive.addEventListener("click", e => {
+    e.preventDefault();
+    showView("archive");
+  });
+}
+
 $$("#tb-tabs button").forEach(b => b.addEventListener("click", () => {
   if (b.dataset.nav === "home") showView("home");
   else if (b.dataset.nav === "archive") showView("archive");
+  else if (b.dataset.nav === "friends") showView("friends");
   else showView("about");
 }));
 document.getElementById("r-font-dec").addEventListener("click", () => {
@@ -1112,13 +1372,66 @@ document.getElementById("r-body").addEventListener("click", e => {
   if (!btn) return;
   const pre = btn.closest("pre");
   const code = pre ? (pre.querySelector("code") ? pre.querySelector("code").textContent : "") : "";
+  const doFeedback = () => {
+    btn.classList.add("copied");
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>已复制</span>';
+    showToast("代码已复制到剪贴板");
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.innerHTML = orig;
+    }, 2000);
+  };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(code).then(() => showToast("代码已复制")).catch(() => showToast("复制失败"));
+    navigator.clipboard.writeText(code).then(doFeedback).catch(() => fallbackCopy(code, doFeedback));
   } else {
-    showToast("复制失败");
+    fallbackCopy(code, doFeedback);
   }
 });
 document.addEventListener("keydown", e => {
+  const modal = document.getElementById("search-modal");
+  const isSearchOpen = modal && !modal.hasAttribute("hidden") && modal.classList.contains("open");
+
+  if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    if (isSearchOpen) closeSearchModal(); else openSearchModal();
+    return;
+  }
+
+  if (isSearchOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeSearchModal();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (searchMatches.length) {
+        searchActiveIdx = (searchActiveIdx + 1) % searchMatches.length;
+        updateSearchActive();
+      }
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (searchMatches.length) {
+        searchActiveIdx = (searchActiveIdx - 1 + searchMatches.length) % searchMatches.length;
+        updateSearchActive();
+      }
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (searchActiveIdx >= 0 && searchMatches[searchActiveIdx]) {
+        const post = searchMatches[searchActiveIdx];
+        const postIdx = state.posts.indexOf(post);
+        if (postIdx >= 0) selectArticle(postIdx);
+        closeSearchModal();
+      }
+      return;
+    }
+  }
+
   if (e.key === "Escape") {
     // 图片灯箱优先关闭，再关侧栏
     const lb = document.getElementById("lightbox");
@@ -1126,9 +1439,13 @@ document.addEventListener("keydown", e => {
     toggleSidebar(false);
     return;
   }
-  if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+  if (e.key === "/" && !e.ctrlKey && !e.metaKey && !isSearchOpen) {
     const tag2 = (e.target && e.target.tagName) || "";
-    if (tag2 !== "INPUT" && tag2 !== "TEXTAREA") { e.preventDefault(); document.getElementById("side-search").focus(); return; }
+    if (tag2 !== "INPUT" && tag2 !== "TEXTAREA") {
+      e.preventDefault();
+      openSearchModal();
+      return;
+    }
   }
   const tag = (e.target && e.target.tagName) || "";
   if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -1141,21 +1458,36 @@ window.addEventListener("resize", () => { renderHome(); });
 
 /* hash 路由：直链打开文章 / 回主页 */
 window.addEventListener("hashchange", () => {
-  const m = (location.hash || "").match(/^#\/post\/(.+)$/);
+  const hash = location.hash || "";
+  const m = hash.match(/^#\/post\/(.+)$/);
   if (m) {
     const key = decodeURI(m[1]);
     const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
     if (idx >= 0) selectArticle(idx); else showView("home");
+  } else if (hash === "#/archive") {
+    showView("archive");
+  } else if (hash === "#/friends") {
+    showView("friends");
+  } else if (hash === "#/about") {
+    showView("about");
   } else {
     if (state.nav !== "home") showView("home");
   }
 });
 function openFromHashIfAny() {
-  const m = (location.hash || "").match(/^#\/post\/(.+)$/);
-  if (!m) return;
-  const key = decodeURI(m[1]);
-  const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
-  if (idx >= 0) selectArticle(idx);
+  const hash = location.hash || "";
+  const m = hash.match(/^#\/post\/(.+)$/);
+  if (m) {
+    const key = decodeURI(m[1]);
+    const idx = state.posts.findIndex(p => p.slug === key || p.title === key);
+    if (idx >= 0) selectArticle(idx);
+  } else if (hash === "#/archive") {
+    showView("archive");
+  } else if (hash === "#/friends") {
+    showView("friends");
+  } else if (hash === "#/about") {
+    showView("about");
+  }
 }
 
 /* 返回顶部 + 阅读进度 */
