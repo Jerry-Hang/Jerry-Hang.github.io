@@ -333,6 +333,15 @@ impl IpRateLimiter {
     fn check_and_record(&self, ip: &str) -> Result<(), (StatusCode, &'static str)> {
         let now = Instant::now();
         let mut map = self.records.write().unwrap();
+
+        // 内存过载防御：当条目激增时触发内联清理，防止伪造随机 IP 撑爆内存
+        if map.len() >= 4000 && !map.contains_key(ip) {
+            Self::prune_internal(&mut map, now);
+            if map.len() >= 5000 {
+                return Err((StatusCode::TOO_MANY_REQUESTS, "System rate limiter saturated"));
+            }
+        }
+
         let entry = map.entry(ip.to_string()).or_insert_with(|| IpState {
             window_start: now,
             req_count: 0,
@@ -372,6 +381,9 @@ impl IpRateLimiter {
     fn record_scan_error(&self, ip: &str) {
         let now = Instant::now();
         let mut map = self.records.write().unwrap();
+        if map.len() >= 4000 && !map.contains_key(ip) {
+            Self::prune_internal(&mut map, now);
+        }
         let entry = map.entry(ip.to_string()).or_insert_with(|| IpState {
             window_start: now,
             req_count: 0,
@@ -385,14 +397,8 @@ impl IpRateLimiter {
         }
     }
 
-    /// 定期清理过期条目，保持内存轻量（上限 10,000 个 IP）
-    fn prune(&self) {
-        let now = Instant::now();
-        let mut map = self.records.write().unwrap();
-        if map.len() > 10000 {
-            map.clear();
-            return;
-        }
+    fn prune_internal(map: &mut HashMap<String, IpState>, now: Instant) {
+        // 保留有效封禁条目与活跃窗口条目
         map.retain(|_, state| {
             if let Some(b) = state.banned_until {
                 b > now
@@ -400,6 +406,26 @@ impl IpRateLimiter {
                 now.duration_since(state.window_start) < Duration::from_secs(30)
             }
         });
+        // 若仍超过 4000 条，淘汰最旧的非封禁条目，誓死避免清空已封禁的恶意 IP
+        if map.len() > 4000 {
+            let mut unbanned_keys: Vec<(String, Instant)> = map
+                .iter()
+                .filter(|(_, state)| state.banned_until.map_or(true, |b| b <= now))
+                .map(|(k, state)| (k.clone(), state.window_start))
+                .collect();
+            unbanned_keys.sort_by_key(|(_, t)| *t);
+            let to_remove = map.len().saturating_sub(3500);
+            for (k, _) in unbanned_keys.into_iter().take(to_remove) {
+                map.remove(&k);
+            }
+        }
+    }
+
+    /// 定期清理过期条目，保持内存轻量并持久锁定恶意 IP
+    fn prune(&self) {
+        let now = Instant::now();
+        let mut map = self.records.write().unwrap();
+        Self::prune_internal(&mut map, now);
     }
 }
 
@@ -494,28 +520,37 @@ fn ua_of(req: &Request) -> String {
         .to_string()
 }
 
+fn parse_valid_ip(s: &str) -> Option<String> {
+    let s = s.trim();
+    if s.is_empty() || s.len() > 64 {
+        return None;
+    }
+    s.parse::<std::net::IpAddr>().ok().map(|ip| ip.to_string())
+}
+
 /// 取访客真实 IP。
 ///
 /// 为什么需要：公网流量是经 Cloudflare 隧道进来的，cloudflared 在本机
 /// 反向连到 127.0.0.1:8090，所以 peer 永远是回环地址。
-/// 直接记 peer 的话，2.8 万条日志全是 127.0.0.1，安全监控形同虚设。
 ///
-/// 优先取 Cloudflare 的 CF-Connecting-IP（它由边缘写入，客户端伪造不了），
-/// 其次 X-Forwarded-For 的第一段，最后才回落到 peer。
+/// 安全隔离原则：
+/// 1. 仅当 peer 为回环地址（表明来自本机 Cloudflare Tunnel 守护进程）时，才信任转发头；
+/// 2. 若直接从公网 TCP 连入（非回环 peer），一律以底层 TCP peer.ip 为准，杜绝伪造头欺骗限流器；
+/// 3. 所有提取出的 IP 必须严格通过 IpAddr 解析验证，阻断恶意畸形伪造串。
 fn client_ip(headers: &HeaderMap, peer: &SocketAddr) -> String {
-    for name in ["cf-connecting-ip", "true-client-ip", "x-real-ip"] {
-        if let Some(v) = headers.get(name).and_then(|v| v.to_str().ok()) {
-            let v = v.trim();
-            if !v.is_empty() {
-                return v.to_string();
+    if peer.ip().is_loopback() {
+        for name in ["cf-connecting-ip", "true-client-ip", "x-real-ip"] {
+            if let Some(v) = headers.get(name).and_then(|v| v.to_str().ok()) {
+                if let Some(valid) = parse_valid_ip(v) {
+                    return valid;
+                }
             }
         }
-    }
-    if let Some(v) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        if let Some(first) = v.split(',').next() {
-            let first = first.trim();
-            if !first.is_empty() {
-                return first.to_string();
+        if let Some(v) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            if let Some(first) = v.split(',').next() {
+                if let Some(valid) = parse_valid_ip(first) {
+                    return valid;
+                }
             }
         }
     }
@@ -1137,7 +1172,33 @@ fn matches_ext(target: &str, exts: &[&str]) -> bool {
     exts.iter().any(|e| *e == ext)
 }
 
-fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {    let rel = sanitize_relative_path(raw_target)?;
+const ALLOWED_STATIC_EXTS: &[&str] = &[
+    "html", "htm", "css", "js", "mjs", "json", "xml", "txt", "png", "jpg", "jpeg", "gif", "svg",
+    "webp", "ico", "avif", "woff", "woff2", "ttf", "otf", "eot", "pdf", "mp3", "mp4", "webm",
+    "wasm",
+];
+
+const FORBIDDEN_DIRS: &[&str] = &["src", "target", "deploy", "_posts", ".git"];
+
+fn is_allowed_static_file(path: &Path) -> bool {
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    // 禁止读取隐藏文件（以点开头）与备份临时文件（以波浪线结尾）
+    if file_name.starts_with('.') || file_name.ends_with('~') {
+        return false;
+    }
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    ALLOWED_STATIC_EXTS.contains(&ext.as_str())
+}
+
+fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {
+    let rel = sanitize_relative_path(raw_target)?;
     let full = if rel.is_empty() {
         root_canon.to_path_buf()
     } else {
@@ -1150,11 +1211,14 @@ fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {    l
     if canon.is_dir() {
         let idx = canon.join("index.html");
         if idx.is_file() {
-            return fs::canonicalize(&idx).ok();
+            let canon_idx = fs::canonicalize(&idx).ok()?;
+            if is_allowed_static_file(&canon_idx) {
+                return Some(canon_idx);
+            }
         }
         return None;
     }
-    if canon.is_file() {
+    if canon.is_file() && is_allowed_static_file(&canon) {
         return Some(canon);
     }
     None
@@ -1162,15 +1226,20 @@ fn resolve_target(root_canon: &Path, raw_target: &str) -> Option<PathBuf> {    l
 
 fn sanitize_relative_path(raw: &str) -> Option<String> {
     let decoded = percent_decode(raw)?;
-    if decoded.contains('\0') {
-        return None;
-    }
-    if decoded.contains('\\') {
+    if decoded.contains('\0') || decoded.contains('\\') {
         return None;
     }
     let no_leading = decoded.trim_start_matches('/');
     for seg in no_leading.split('/') {
-        if seg == ".." {
+        if seg.is_empty() {
+            continue;
+        }
+        // 严格阻断路径穿越与隐藏目录/源码/构建目录访问
+        if seg == ".."
+            || seg.starts_with('.')
+            || FORBIDDEN_DIRS.contains(&seg)
+            || seg.starts_with("_backup")
+        {
             return None;
         }
     }
@@ -1448,5 +1517,97 @@ mod tests {
         }
         let scan_res = limiter.check_and_record(scanner_ip);
         assert!(scan_res.is_err());
+    }
+
+    #[test]
+    fn test_sanitize_relative_path() {
+        assert_eq!(sanitize_relative_path("index.html"), Some("index.html".to_string()));
+        assert_eq!(sanitize_relative_path("/app.js"), Some("app.js".to_string()));
+        assert_eq!(sanitize_relative_path("blog/about-me/"), Some("blog/about-me/".to_string()));
+
+        // 路径穿越攻击
+        assert_eq!(sanitize_relative_path("/.."), None);
+        assert_eq!(sanitize_relative_path("/../etc/passwd"), None);
+        assert_eq!(sanitize_relative_path("/blog/../../blog.db"), None);
+        assert_eq!(sanitize_relative_path("/..%2f..%2fconfig.toml"), None);
+
+        // 敏感目录与隐藏文件访问
+        assert_eq!(sanitize_relative_path("/.git/config"), None);
+        assert_eq!(sanitize_relative_path("/.env"), None);
+        assert_eq!(sanitize_relative_path("/.gitignore"), None);
+        assert_eq!(sanitize_relative_path("/src/main.rs"), None);
+        assert_eq!(sanitize_relative_path("/target/release/blog_ctl"), None);
+        assert_eq!(sanitize_relative_path("/_posts/sample.md"), None);
+        assert_eq!(sanitize_relative_path("/_backup_test/data"), None);
+
+        // 非法字符阻断
+        assert_eq!(sanitize_relative_path("/index.html%00"), None);
+        assert_eq!(sanitize_relative_path(r"/..\..\Windows\win.ini"), None);
+    }
+
+    #[test]
+    fn test_is_allowed_static_file() {
+        assert!(is_allowed_static_file(Path::new("index.html")));
+        assert!(is_allowed_static_file(Path::new("app.js")));
+        assert!(is_allowed_static_file(Path::new("style.css")));
+        assert!(is_allowed_static_file(Path::new("avatar.jpg")));
+        assert!(is_allowed_static_file(Path::new("eric-terminal.png")));
+        assert!(is_allowed_static_file(Path::new("posts.json")));
+        assert!(is_allowed_static_file(Path::new("feed.xml")));
+        assert!(is_allowed_static_file(Path::new("robots.txt")));
+
+        // 敏感扩展名必须拒收
+        assert!(!is_allowed_static_file(Path::new("Cargo.toml")));
+        assert!(!is_allowed_static_file(Path::new("Cargo.lock")));
+        assert!(!is_allowed_static_file(Path::new("blog.db")));
+        assert!(!is_allowed_static_file(Path::new("blog.db-wal")));
+        assert!(!is_allowed_static_file(Path::new("main.rs")));
+        assert!(!is_allowed_static_file(Path::new("script.sh")));
+        assert!(!is_allowed_static_file(Path::new("deploy.ps1")));
+        assert!(!is_allowed_static_file(Path::new(".gitignore")));
+        assert!(!is_allowed_static_file(Path::new(".env")));
+        assert!(!is_allowed_static_file(Path::new("index.html~")));
+    }
+
+    #[test]
+    fn test_client_ip_spoof_defense() {
+        use std::net::SocketAddr;
+        let loopback: SocketAddr = "127.0.0.1:54321".parse().unwrap();
+        let external: SocketAddr = "198.51.100.22:54321".parse().unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("cf-connecting-ip", "203.0.113.195".parse().unwrap());
+
+        // 回环连接（如 Cloudflare Tunnel）：信任边缘头
+        assert_eq!(client_ip(&headers, &loopback), "203.0.113.195");
+
+        // 外部直连连接：拒不信任伪造头，强制使用底层 TCP peer.ip
+        assert_eq!(client_ip(&headers, &external), "198.51.100.22");
+
+        // 伪造畸形/注入字符串时拒收，回退到 peer.ip
+        let mut bad_headers = HeaderMap::new();
+        bad_headers.insert("cf-connecting-ip", "malicious_string_not_ip".parse().unwrap());
+        assert_eq!(client_ip(&bad_headers, &loopback), "127.0.0.1");
+    }
+
+    #[test]
+    fn test_ip_rate_limiter_memory_and_ban_retention() {
+        let limiter = IpRateLimiter::new();
+        let banned_ip = "9.9.9.9";
+        for _ in 0..16 {
+            limiter.record_scan_error(banned_ip);
+        }
+        assert!(limiter.check_and_record(banned_ip).is_err());
+
+        // 模拟大量不同 IP 涌入，触发容量清理
+        for i in 0..4500 {
+            let ip = format!("10.0.{}.{}", i / 256, i % 256);
+            let _ = limiter.check_and_record(&ip);
+        }
+
+        // 确保被封禁的 IP 仍然被封禁（誓死不被清空），且内存被严格限额
+        assert!(limiter.check_and_record(banned_ip).is_err());
+        let map = limiter.records.read().unwrap();
+        assert!(map.len() <= 4000);
     }
 }

@@ -220,7 +220,7 @@ fn write_post_file(repo: &Path, filename: &str, content: &str) -> io::Result<Pat
     Ok(path)
 }
 
-fn create_post(title: &str, meta: Option<PostMeta>, auto_cats: bool) {
+fn create_post(title: &str, meta: Option<PostMeta>, _auto_cats: bool) {
     let repo = match repo_dir() {
         Ok(r) => r,
         Err(e) => { eprintln!("✘ {e}"); return; }

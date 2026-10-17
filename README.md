@@ -68,10 +68,18 @@
     - `RSS >= 480 MB`：紧急熔断，新连接直接返回 503，誓死避免触发 512MB 内核杀进程；
     - `RSS <= 256 MB`：常驻内存彻底回落后完全恢复 100% 满血并发。
 - **防爆破与防 DDoS 洪水限流**：
-  - 纯内存滑动窗口频率限制器（`IpRateLimiter`），基于真实访客 IP（自动解析 `CF-Connecting-IP`）：
+  - 纯内存滑动窗口频率限制器（`IpRateLimiter`），基于真实访客 IP：
+    - 仅当连接底层 TCP peer 为回环地址（来自本机 Cloudflare Tunnel 反向代理）时才解析转发头；直连公网 TCP 时强制锁定真实 IP，杜绝假头欺骗；
+    - 所有提取出的 IP 必须严格通过 IPv4/IPv6 格式解析验证，阻断恶意超长注入串；
     - 10 秒窗口超 120 次请求判定为洪水/爬虫，直接返回 `429 Too Many Requests`（带 `Retry-After: 60`）；
     - 连续 15 次 404 探测路径判定为恶意漏洞扫描器，直接封禁 5 分钟；
-    - 限制器自动修剪过期条目（最大上限 10,000 个 IP，占用内存 < 1MB）。
+    - 限制器引入内存容量上限保护（上限 4,000 个 IP，占用内存 < 300KB），且被封禁的恶意 IP 誓死持久锁定，无法通过伪造大量随机 IP 触发清空脱逃。
+- **路径穿越与静态文件安全白名单**：
+  - 静态资源严格白名单机制（仅放行 `html`, `css`, `js`, `json`, `xml`, `txt`, `png`, `jpg`, `svg`, `webp`, `woff2` 等合法媒体格式）；
+  - 全面阻断以 `.` 开头的隐藏文件/目录（如 `.git`, `.env`, `.gitignore`）以及源码与构建目录（`src/`, `target/`, `deploy/`, `_posts/`）；
+  - 坚决阻断任何对 `.db`, `.toml`, `.rs`, `.sh`, `.ps1` 等敏感配置或数据库的读取，外部探测直接 404。
+- **XSS 伪协议与实体编码深度过滤**：
+  - Markdown 渲染除标签与属性白名单外，对 `href` / `src` 协议引入实体编码解码与严格校验，彻底阻断 `javascript:`, `vbscript:`, `data:` 及其十六进制/十进制实体变体（如 `jav&#x61;script:`）。
 - **协商缓存与性能优化**：
   - 为所有静态资源（壁纸、头像、JS、CSS）与 `/posts.json` 全面支持弱 `ETag` 与 `If-None-Match` 协商，未修改响应 `304 Not Modified`（0 字节传输、0 内存读盘）。
 - **CPU 亲和**：启动时把进程绑到指定核（Linux/Android 用 `sched_setaffinity`，Windows 用 `SetProcessAffinityMask`）。

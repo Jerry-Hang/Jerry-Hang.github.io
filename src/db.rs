@@ -137,6 +137,71 @@ fn escape_attr(v: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+fn is_safe_url(raw: &str) -> bool {
+    let mut clean = String::with_capacity(raw.len());
+    let mut chars = raw.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c.is_control() || c.is_whitespace() {
+            continue;
+        }
+        if c == '&' {
+            let mut ent = String::new();
+            while let Some(&nc) = chars.peek() {
+                if nc == ';' {
+                    chars.next();
+                    break;
+                }
+                if nc.is_alphanumeric() || nc == '#' {
+                    ent.push(chars.next().unwrap());
+                } else {
+                    break;
+                }
+            }
+            if let Some(dec) = decode_entity(&ent) {
+                if !dec.is_control() && !dec.is_whitespace() {
+                    clean.push(dec);
+                }
+            } else {
+                clean.push('&');
+                clean.push_str(&ent);
+            }
+        } else {
+            clean.push(c);
+        }
+    }
+
+    let low = clean.to_ascii_lowercase();
+    if low.starts_with("javascript:")
+        || low.starts_with("vbscript:")
+        || low.starts_with("data:")
+        || low.starts_with("file:")
+    {
+        return false;
+    }
+    if let Some(pos) = low.find(':') {
+        let scheme = &low[..pos];
+        if scheme != "http" && scheme != "https" && scheme != "mailto" && scheme != "tel" {
+            return false;
+        }
+    }
+    true
+}
+
+fn decode_entity(ent: &str) -> Option<char> {
+    if let Some(hex) = ent.strip_prefix("#x").or_else(|| ent.strip_prefix("#X")) {
+        u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
+    } else if let Some(dec) = ent.strip_prefix('#') {
+        dec.parse::<u32>().ok().and_then(char::from_u32)
+    } else {
+        match ent {
+            "colon" => Some(':'),
+            "tab" => Some('\t'),
+            "newline" => Some('\n'),
+            _ => None,
+        }
+    }
+}
+
 fn scrub_open(tag: &str, name: &str) -> String {
     let inner = &tag[1..tag.len() - 1];
     let attr_part = inner
@@ -153,6 +218,7 @@ fn scrub_open(tag: &str, name: &str) -> String {
             || lv.contains("data:")
             || lv.contains("expression")
             || !SAFE_ATTRS.contains(&lk.as_str())
+            || ((lk == "href" || lk == "src") && !is_safe_url(&v))
         {
             continue;
         }
@@ -483,7 +549,7 @@ impl Db {
             .ok();
 
         match existing {
-            Some(id) if !force => Ok(ImportOutcome::Skipped),
+            Some(_id) if !force => Ok(ImportOutcome::Skipped),
             Some(id) => {
                 conn.execute(
                     "UPDATE posts SET title=?1,content_md=?2,content_html=?3,categories=?4,tags=?5,desc=?6,date=?7,updated_at=datetime('now') WHERE id=?8",
@@ -905,6 +971,44 @@ mod tests {
         assert_eq!(idx_count, 4, "expected 4 indexes on request_logs");
         drop(conn);
         let _ = std::fs::remove_file(&dir);
+    }
+
+    #[test]
+    fn test_is_safe_url() {
+        assert!(is_safe_url("https://jerry-hang.blog"));
+        assert!(is_safe_url("http://example.com/page"));
+        assert!(is_safe_url("/blog/about-me/"));
+        assert!(is_safe_url("/assets/avatar.jpg"));
+        assert!(is_safe_url("#heading-1"));
+        assert!(is_safe_url("mailto:admin@example.com"));
+        assert!(is_safe_url("tel:+123456789"));
+
+        // 攻击向量测试
+        assert!(!is_safe_url("javascript:alert(1)"));
+        assert!(!is_safe_url("JAVASCRIPT:alert(document.cookie)"));
+        assert!(!is_safe_url("java\0script:alert(1)"));
+        assert!(!is_safe_url("jav&#x61;script:alert(1)"));
+        assert!(!is_safe_url("&#106;avascript:alert(1)"));
+        assert!(!is_safe_url("vbscript:msgbox(1)"));
+        assert!(!is_safe_url("data:text/html,<script>alert(1)</script>"));
+        assert!(!is_safe_url("file:///etc/passwd"));
+        assert!(!is_safe_url("gopher://127.0.0.1:6379"));
+    }
+
+    #[test]
+    fn test_render_markdown_xss_protection() {
+        let md1 = "[恶意链接](javascript:alert(1))";
+        let html1 = render_markdown(md1);
+        assert!(!html1.contains("javascript:alert"), "不应包含可执行 javascript 伪协议: {html1}");
+
+        let md2 = "<script>alert('pwned')</script>";
+        let html2 = render_markdown(md2);
+        assert!(!html2.contains("<script>"), "script 标签应被转义: {html2}");
+        assert!(html2.contains("&lt;script&gt;"));
+
+        let md3 = "<img src=x onerror=alert(1)>";
+        let html3 = render_markdown(md3);
+        assert!(!html3.contains("onerror"), "内联事件属性必须被剥离: {html3}");
     }
 }
 
