@@ -15,9 +15,10 @@
 
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[path = "../db.rs"]
+#[allow(dead_code)]
 mod db;
 
 /// 从 Markdown 文件里解析 frontmatter。
