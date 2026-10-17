@@ -92,16 +92,20 @@ The real visitor IP is taken from `CF-Connecting-IP` → `True-Client-IP` →
 `cloudflared` connects *back* to the origin, so the peer address is always
 loopback and useless for this purpose.
 
-### Resource protection
-
-- **Concurrency gate** — an `AtomicUsize` CAS counter; over the limit it
-  returns `503` rather than piling up.
-- **Memory circuit breaker** — samples RSS once a second; halves the
-  concurrency ceiling above 1 GiB and restores it below 512 MiB (with
-  hysteresis so it does not oscillate between the two thresholds).
-- **CPU affinity** — pins the process at startup via `sched_setaffinity` on
-  Linux/Android or `SetProcessAffinityMask` on Windows. Strictly
-  **best-effort**: on failure it warns on stderr and continues.
+### Resource protection & Defensive Security
+ 
+- **Concurrency gate** — an `AtomicUsize` CAS counter; over the limit it returns `503` rather than piling up.
+- **Memory circuit breaker** — samples RSS once a second; multi-stage hysteresis: 384MB throttle, 448MB critical degrade, 480MB emergency circuit breaker, and 256MB full recovery.
+- **Anti-Flood & Rate Limiter (`IpRateLimiter`)**:
+  - Validates visitor IP using strict IPv4/IPv6 parsing; only trusts reverse-proxy headers (`CF-Connecting-IP`, `X-Forwarded-For`) when incoming TCP peer is loopback (Cloudflare tunnel daemon). Direct external connections enforce the underlying TCP socket address to prevent spoofing.
+  - 10-second sliding window limit (120 reqs -> 429 Too Many Requests); 15 consecutive 404s trigger automatic 5-minute ban.
+  - Strict memory bounding (< 4,000 entries, < 300KB RAM) with ban persistence that cannot be flushed by random IP floods.
+- **Path Traversal & Static Asset Whitelist**:
+  - Restricts served files strictly to recognized safe web media extensions (`html`, `css`, `js`, `json`, `xml`, `txt`, `png`, `jpg`, `svg`, `webp`, `woff2`).
+  - Completely blocks dotfiles (`.git`, `.env`, `.gitignore`), source and build directories (`src/`, `target/`, `deploy/`, `_posts/`), and sensitive formats (`.db`, `.toml`, `.rs`, `.sh`, `.ps1`), immediately responding with 404.
+- **Deep XSS Sanitization**:
+  - Markdown output cleanses both tags and attributes. Safe protocol enforcement on `href` and `src` strips `javascript:`, `vbscript:`, `data:`, control characters, and hex/decimal HTML entity bypasses (e.g. `jav&#x61;script:`).
+- **CPU affinity** — pins the process at startup via `sched_setaffinity` on Linux/Android or `SetProcessAffinityMask` on Windows. Strictly **best-effort**: on failure it warns on stderr and continues.
 
 ### UI & Interactivity
  

@@ -16,7 +16,7 @@ const FRIENDS = [
   {
     name: "Eric-Terminal",
     url: "https://blog.ericterminal.com",
-    avatar: "https://github.com/Eric-Terminal.png",
+    avatar: "/assets/eric-terminal.png",
     bio: "专注于现代前端技术与全栈折腾，cf-astro-blog 作者。",
     tags: ["前端", "Astro", "开源"]
   },
