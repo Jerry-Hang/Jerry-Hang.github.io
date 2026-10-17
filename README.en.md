@@ -38,20 +38,19 @@ Paired with a `cloudflared` tunnel, it gives you a personal blog with
 
 ## Highlights
 
-### Security by physical isolation
+### Security by physical isolation & Trusted Device Stealth Model
 
-The two-port split is the single most important design decision here:
+The two-port split combined with single-use trusted pairing is the cornerstone of the architecture:
 
-| | Public port `0.0.0.0:8090` | Admin port `127.0.0.1:8091` |
+| | Public port `0.0.0.0:8090` | Admin channel (SSH + CLI / Loopback / Trusted Pairing) |
 |---|---|---|
-| Who can reach it | Anyone | Local machine only |
-| Allowed methods | `GET` / `HEAD` only — everything else `404` | All |
-| API | **None** (`/api/*` falls through to static and 404s) | Full admin API |
-| Authentication | Not required | Required |
-| Concurrency gate | Yes (returns `503` when saturated) | No (admin traffic is exempt) |
+| Who can reach it | Anyone (Read/Interact); Paired trusted devices can access Admin | Authenticated SSH devices only |
+| Allowed methods | Unauthenticated: **`GET` / `HEAD`** & rate-limited like/pair APIs; everything else `404` | Full management access |
+| Admin endpoints | **Stealth 404** (all untrusted `/admin` requests return `404 Not Found`) | Local `blog_server ctl` CLI / Loopback / Trusted access |
+| Authentication | Single-use device pairing token (`blog_server ctl pair`) + password hash | **SSH Ed25519 key authentication only** |
+| Concurrency gate | Yes (returns `503` when saturated, with IP rate limiting & brute-force defense) | No (admin traffic is exempt) |
 
-Beyond binding to loopback, the admin handler **re-checks that the peer
-address is a loopback address** — belt and braces.
+Beyond binding to loopback, untrusted requests to `/admin` or `/api/admin/*` are masked as `404 Not Found` (never 401/403), giving attackers and scanners zero reconnaissance surface.
 
 ### Authentication & Hardened Admin Model
 
@@ -573,10 +572,18 @@ restriction, not a bug**. The code is best-effort and only warns on stderr.
 
 ### Admin panel
 
-**Clicking "run command" pops up a Basic auth dialog**
+**Why does accessing `/admin` or `/login` return 404 Not Found?**
 
-**That is by design.** `blog_priv` can only be obtained via HTTP Basic;
-form login issues `blog_admin` only.
+**That is by design (Stealth 404 Defense).** To achieve a zero-footprint attack surface, any untrusted external request to `/admin`, `/login`, or `/api/admin/*` returns a strict `404 Not Found` (never 401 or 403). External scanners and botnets cannot detect the existence of an admin console.
+
+To access the admin console from an authorized device (e.g. mobile phone):
+1. Connect via SSH to the server and run: `blog_server ctl pair "My Mobile"`
+2. Open the generated 15-minute single-use pairing link on your mobile browser.
+3. Upon pairing, the top navigation dynamically displays the "Admin" button and grants access.
+
+**Why was web-based command execution removed?**
+
+To permanently eliminate server springboard vectors and privilege escalation risks, all `sh -c` execution and arbitrary file reading endpoints were excised. System maintenance is performed strictly over SSH with Ed25519 public/private keys.
 
 **The "front-end ↗" link does nothing, or bounces back to the login page**
 

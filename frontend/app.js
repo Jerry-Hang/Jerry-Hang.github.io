@@ -682,6 +682,7 @@ function openArticle(idx) {
   state.outline = outline;
   const prev = state.posts[idx - 1];
   const next = state.posts[idx + 1];
+  const slug = p.slug || p.title;
   document.getElementById("r-foot").innerHTML =
     '<div class="r-foot-pagers">' +
       '<button class="pn-btn pn-prev' + (prev ? "" : " disabled") + '" id="r-prev" title="' + (prev ? esc(prev.title) : "") + '">' +
@@ -694,9 +695,21 @@ function openArticle(idx) {
       '</button>' +
     '</div>' +
     '<div class="r-foot-actions">' +
-      '<button class="act-btn" id="r-back"><svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="15 18 9 12 15 6"/><line x1="9" y1="12" x2="20" y2="12"/></svg><span>返回主页</span></button>' +
+      '<button class="act-btn r-like-btn" id="r-like" title="喜欢这篇文章">' +
+        '<svg class="act-icon like-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' +
+        '<span id="r-like-count">点赞</span>' +
+      '</button>' +
+      '<button class="act-btn" id="r-share-qr" title="生成二维码分享">' +
+        '<svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>' +
+        '<span>扫码阅读</span>' +
+      '</button>' +
       '<button class="act-btn" id="r-copy"><svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制链接</span></button>' +
+      '<button class="act-btn" id="r-back"><svg class="act-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="15 18 9 12 15 6"/><line x1="9" y1="12" x2="20" y2="12"/></svg><span>返回主页</span></button>' +
     '</div>';
+
+  fetchLikes(slug);
+  document.getElementById("r-like").addEventListener("click", () => submitLike(slug));
+  document.getElementById("r-share-qr").addEventListener("click", () => showShareModal(p));
   document.getElementById("r-copy").addEventListener("click", copyPageLink);
   if (prev) document.getElementById("r-prev").addEventListener("click", () => selectArticle(idx - 1));
   if (next) document.getElementById("r-next").addEventListener("click", () => selectArticle(idx + 1));
@@ -1522,6 +1535,368 @@ function openFromHashIfAny() {
   }, { passive: true });
 })();
 
+/* ---------- 互动点赞与二维码分享 ---------- */
+
+async function fetchLikes(slug) {
+  try {
+    const res = await fetch("/api/posts/" + encodeURIComponent(slug) + "/likes");
+    if (!res.ok) return;
+    const d = await res.json();
+    const el = document.getElementById("r-like-count");
+    if (el) el.textContent = d.likes > 0 ? d.likes + " 赞" : "点赞";
+  } catch (e) { /* 静默失败 */ }
+}
+
+async function submitLike(slug) {
+  const btn = document.getElementById("r-like");
+  const el = document.getElementById("r-like-count");
+  if (!btn) return;
+  btn.classList.add("liked");
+  try {
+    const res = await fetch("/api/posts/" + encodeURIComponent(slug) + "/like", { method: "POST" });
+    if (!res.ok) { showToast("频率过快，请稍后"); return; }
+    const d = await res.json();
+    if (el) el.textContent = d.likes + " 赞";
+    showToast("+1 感谢喜欢！");
+  } catch (e) {
+    showToast("网络连接失败");
+  }
+}
+
+function showShareModal(p) {
+  const modal = document.getElementById("qr-modal");
+  if (!modal) return;
+  const url = window.location.origin + articleUrl(p);
+  const titleEl = document.getElementById("qr-post-title");
+  if (titleEl) titleEl.textContent = p.title;
+  const qrWrap = document.getElementById("qr-svg-wrap");
+  if (qrWrap) qrWrap.innerHTML = generateQrSvg(url, 170);
+
+  modal.removeAttribute("hidden");
+  modal.classList.add("open");
+
+  const closeBtn = document.getElementById("qr-modal-close");
+  if (closeBtn) closeBtn.onclick = () => {
+    modal.classList.remove("open");
+    setTimeout(() => modal.setAttribute("hidden", ""), 220);
+  };
+  modal.onclick = e => {
+    if (e.target === modal) {
+      modal.classList.remove("open");
+      setTimeout(() => modal.setAttribute("hidden", ""), 220);
+    }
+  };
+  const copyBtn = document.getElementById("qr-copy-btn");
+  if (copyBtn) copyBtn.onclick = () => {
+    copyPageLink();
+    modal.classList.remove("open");
+    setTimeout(() => modal.setAttribute("hidden", ""), 220);
+  };
+}
+
+/* 纯原生 JS 生成矢量 SVG 二维码（零外部依赖、零 CDN） */
+function generateQrSvg(str, size) {
+  size = size || 180;
+  const PAD0 = 0xEC, PAD1 = 0x11;
+  const EXP = new Array(256), LOG = new Array(256);
+  for (let i = 0; i < 8; i++) EXP[i] = 1 << i;
+  for (let i = 8; i < 256; i++) EXP[i] = EXP[i-4] ^ EXP[i-5] ^ EXP[i-6] ^ EXP[i-8];
+  for (let i = 0; i < 255; i++) LOG[EXP[i]] = i;
+  const glog = n => LOG[n];
+  const gexp = n => EXP[(n % 255 + 255) % 255];
+
+  function polyMul(p1, p2) {
+    const num = new Array(p1.length + p2.length - 1).fill(0);
+    for (let i = 0; i < p1.length; i++) {
+      for (let j = 0; j < p2.length; j++) {
+        num[i + j] ^= gexp(glog(p1[i]) + glog(p2[j]));
+      }
+    }
+    return num;
+  }
+  function polyMod(p, ec) {
+    let num = p.slice();
+    while (num.length >= ec.length) {
+      const leading = num[0];
+      if (leading !== 0) {
+        const factor = glog(leading);
+        for (let i = 0; i < ec.length; i++) {
+          num[i] ^= gexp(glog(ec[i]) + factor);
+        }
+      }
+      num.shift();
+    }
+    return num;
+  }
+  function getEcPoly(ecCount) {
+    let p = [1];
+    for (let i = 0; i < ecCount; i++) p = polyMul(p, [1, gexp(i)]);
+    return p;
+  }
+
+  const VERSIONS = [
+    [1, 19, 7, 1, 21],
+    [2, 34, 10, 1, 25],
+    [3, 55, 15, 1, 29],
+    [4, 80, 20, 1, 33],
+    [5, 108, 26, 1, 37],
+    [6, 136, 18, 2, 41],
+    [7, 156, 20, 2, 45],
+    [8, 194, 24, 2, 49],
+    [9, 232, 30, 2, 53],
+    [10, 274, 18, 4, 57]
+  ];
+
+  const utf8Bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 128) utf8Bytes.push(c);
+    else if (c < 2048) { utf8Bytes.push(192 | (c >> 6), 128 | (c & 63)); }
+    else { utf8Bytes.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63)); }
+  }
+
+  let spec = null;
+  for (let v of VERSIONS) {
+    const headerBits = 4 + (v[0] < 10 ? 8 : 16);
+    if (utf8Bytes.length + Math.ceil(headerBits / 8) <= v[1]) {
+      spec = v;
+      break;
+    }
+  }
+  if (!spec) spec = VERSIONS[VERSIONS.length - 1];
+  const [ver, totalData, ecBytes, blocks, modCount] = spec;
+
+  let bits = [];
+  function pushBits(val, len) {
+    for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
+  }
+
+  pushBits(0b0100, 4);
+  pushBits(utf8Bytes.length, ver < 10 ? 8 : 16);
+  for (let b of utf8Bytes) pushBits(b, 8);
+
+  const maxDataBits = totalData * 8;
+  const termLen = Math.min(4, maxDataBits - bits.length);
+  pushBits(0, termLen);
+  while (bits.length % 8 !== 0) bits.push(0);
+
+  const dataBytes = [];
+  for (let i = 0; i < bits.length; i += 8) {
+    let b = 0;
+    for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+    dataBytes.push(b);
+  }
+
+  let padIdx = 0;
+  while (dataBytes.length < totalData) {
+    dataBytes.push(padIdx % 2 === 0 ? PAD0 : PAD1);
+    padIdx++;
+  }
+
+  const ecPoly = getEcPoly(ecBytes);
+  const dataPerBlock = Math.floor(totalData / blocks);
+  const blockDataList = [];
+  const blockEcList = [];
+
+  for (let b = 0; b < blocks; b++) {
+    const start = b * dataPerBlock;
+    const bData = dataBytes.slice(start, start + dataPerBlock);
+    blockDataList.push(bData);
+    const padded = bData.concat(new Array(ecBytes).fill(0));
+    blockEcList.push(polyMod(padded, ecPoly));
+  }
+
+  const finalBytes = [];
+  for (let i = 0; i < dataPerBlock; i++) {
+    for (let b = 0; b < blocks; b++) finalBytes.push(blockDataList[b][i]);
+  }
+  for (let i = 0; i < ecBytes; i++) {
+    for (let b = 0; b < blocks; b++) finalBytes.push(blockEcList[b][i]);
+  }
+
+  const matrix = Array.from({ length: modCount }, () => new Array(modCount).fill(null));
+  const isFunction = Array.from({ length: modCount }, () => new Array(modCount).fill(false));
+
+  function setModule(r, c, val) {
+    matrix[r][c] = val;
+    isFunction[r][c] = true;
+  }
+
+  function addFinder(top, left) {
+    for (let r = -1; r <= 7; r++) {
+      for (let c = -1; c <= 7; c++) {
+        const mr = top + r, mc = left + c;
+        if (mr < 0 || mr >= modCount || mc < 0 || mc >= modCount) continue;
+        const val = (r >= 0 && r <= 6 && (c === 0 || c === 6)) ||
+                    (c >= 0 && c <= 6 && (r === 0 || r === 6)) ||
+                    (r >= 2 && r <= 4 && c >= 2 && c <= 4);
+        setModule(mr, mc, val ? 1 : 0);
+      }
+    }
+  }
+  addFinder(0, 0);
+  addFinder(0, modCount - 7);
+  addFinder(modCount - 7, 0);
+
+  for (let i = 8; i < modCount - 8; i++) {
+    if (!isFunction[6][i]) setModule(6, i, i % 2 === 0 ? 1 : 0);
+    if (!isFunction[i][6]) setModule(i, 6, i % 2 === 0 ? 1 : 0);
+  }
+
+  setModule(modCount - 8, 8, 1);
+
+  const ALIGNMENT_LOCS = [
+    [], [], [6, 18], [6, 22], [6, 26], [6, 30],
+    [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]
+  ];
+  const align = ALIGNMENT_LOCS[ver] || [];
+  for (let r of align) {
+    for (let c of align) {
+      if (isFunction[r][c]) continue;
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          setModule(r + dr, c + dc, Math.max(Math.abs(dr), Math.abs(dc)) !== 1 ? 1 : 0);
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < 9; i++) {
+    if (!isFunction[8][i]) isFunction[8][i] = true;
+    if (!isFunction[i][8]) isFunction[i][8] = true;
+  }
+  for (let i = 0; i < 8; i++) {
+    if (!isFunction[8][modCount - 1 - i]) isFunction[8][modCount - 1 - i] = true;
+    if (!isFunction[modCount - 1 - i][8]) isFunction[modCount - 1 - i] = true;
+  }
+
+  let byteIdx = 0, bitIdx = 7;
+  let dir = -1;
+  let row = modCount - 1, col = modCount - 1;
+
+  while (col > 0) {
+    if (col === 6) col--;
+    for (let i = 0; i < modCount; i++) {
+      const r = dir === -1 ? row - i : row + i;
+      for (let c = col; c >= col - 1; c--) {
+        if (!isFunction[r][c]) {
+          let bit = 0;
+          if (byteIdx < finalBytes.length) {
+            bit = (finalBytes[byteIdx] >> bitIdx) & 1;
+            bitIdx--;
+            if (bitIdx < 0) { bitIdx = 7; byteIdx++; }
+          }
+          if ((r + c) % 2 === 0) bit ^= 1;
+          matrix[r][c] = bit;
+        }
+      }
+    }
+    row = dir === -1 ? 0 : modCount - 1;
+    dir = -dir;
+    col -= 2;
+  }
+
+  const formatBits = [1,1,1,0,1,1,1,1,1,0,0,0,1,0,0];
+  for (let i = 0; i < 6; i++) matrix[8][i] = formatBits[i];
+  matrix[8][7] = formatBits[6];
+  matrix[8][8] = formatBits[7];
+  matrix[7][8] = formatBits[8];
+  for (let i = 9; i < 15; i++) matrix[14 - i][8] = formatBits[i];
+
+  for (let i = 0; i < 8; i++) matrix[modCount - 1 - i][8] = formatBits[i];
+  for (let i = 8; i < 15; i++) matrix[8][modCount - 15 + i] = formatBits[i];
+
+  let pathD = "";
+  for (let r = 0; r < modCount; r++) {
+    for (let c = 0; c < modCount; c++) {
+      if (matrix[r][c] === 1) pathD += `M${c},${r}h1v1h-1z `;
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 ${modCount + 4} ${modCount + 4}" width="${size}" height="${size}" style="display:block;border-radius:8px"><rect x="-2" y="-2" width="${modCount + 4}" height="${modCount + 4}" fill="#ffffff"/><path d="${pathD}" fill="#0f172a"/></svg>`;
+}
+
+/* ---------- 可信设备远程后台检测与配对 ---------- */
+async function initTrustedDeviceAuth() {
+  const params = new URLSearchParams(window.location.search);
+  const pairCode = params.get("pair");
+  if (pairCode) {
+    let devId = localStorage.getItem("jb_dev_id");
+    if (!devId) {
+      devId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem("jb_dev_id", devId);
+    }
+    try {
+      const res = await fetch("/api/auth/pair-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: pairCode.trim(),
+          device_id: devId,
+          name: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "移动端设备" : "受信任电脑设备"
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("设备授权成功！已解锁后台管理入口");
+        injectAdminNavButton();
+        params.delete("pair");
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
+        history.replaceState(null, "", newUrl);
+        return;
+      } else {
+        showToast(data.error || "配对失败或配对码已失效");
+      }
+    } catch (e) {
+      showToast("连接配对服务失败");
+    }
+  }
+
+  try {
+    const res = await fetch("/api/auth/check");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.trusted) {
+        injectAdminNavButton();
+      }
+    }
+  } catch (e) { /* 未授权或离线保持静默 */ }
+}
+
+function injectAdminNavButton() {
+  if (document.getElementById("tb-btn-admin")) return;
+  const nav = document.getElementById("tb-tabs");
+  if (!nav) return;
+  const btn = document.createElement("button");
+  btn.id = "tb-btn-admin";
+  btn.className = "tb-tab tb-admin-btn";
+  btn.dataset.nav = "admin";
+  btn.textContent = "后台";
+  btn.title = "进入博客管理后台";
+  btn.addEventListener("click", () => {
+    window.location.href = "/admin";
+  });
+  nav.appendChild(btn);
+
+  // 侧边栏抽屉导航如果已初始化也添加
+  const sideScroll = document.getElementById("post-scroll");
+  if (sideScroll && !document.getElementById("side-btn-admin")) {
+    const sideDiv = document.createElement("div");
+    sideDiv.id = "side-btn-admin";
+    sideDiv.style.padding = "10px 14px 4px";
+    sideDiv.innerHTML = '<button class="act-btn" style="width:100%;justify-content:center;background:rgba(255,255,255,.08);font-size:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>进入管理后台</button>';
+    sideDiv.querySelector("button").addEventListener("click", () => {
+      window.location.href = "/admin";
+    });
+    const sideModes = document.getElementById("side-modes");
+    if (sideModes && sideModes.parentNode) {
+      sideModes.parentNode.insertBefore(sideDiv, sideModes);
+    }
+  }
+}
+
 /* ---------- 初始化 ---------- */
 (function init() {
   applyTheme();
@@ -1529,9 +1904,6 @@ function openFromHashIfAny() {
   // 侧栏初始状态：
   //   窄屏 —— 收起（汉堡抽屉，点按钮展开）
   //   宽屏 —— 默认展开，除非用户之前手动收起过
-  //
-  // 原来这里无条件写 toggleSidebar(false)，把宽屏也强制收起了，
-  // 结果桌面侧栏只剩 34px 的细轨道、左边留一道缝，导航被推到屏幕中间。
   if (window.innerWidth < 1000) {
     toggleSidebar(false);
   } else {
@@ -1539,4 +1911,5 @@ function openFromHashIfAny() {
   }
   showView("home");
   loadPosts();
+  initTrustedDeviceAuth();
 })();
