@@ -174,8 +174,9 @@ body.login::before {
       try { d = await r.json(); } catch (_) {}
 
       if (r.ok && d.ok) {
-        // 会话 cookie 已由服务端下发，直接进后台
-        location.replace('/');
+        // 会话 cookie 已由服务端下发，按访问端环境进后台
+        var target = (location.pathname.indexOf('/admin') >= 0 || location.search.indexOf('ref=admin') >= 0 || (location.port !== '8091' && location.port !== '8081')) ? '/admin' : '/';
+        location.replace(target);
         return;
       }
       showErr(d.error || (r.status === 401 ? '密码不正确' : '登录失败（HTTP ' + r.status + '）'));

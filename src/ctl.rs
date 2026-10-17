@@ -24,7 +24,11 @@ fn usage() {
          blog_server ctl rm <id>\n  \
          blog_server ctl import <dir> [--force]\n  \
          blog_server ctl logs [--page N] [--per N] [--cat C] [--ip I] [--method M]\n  \
-         blog_server ctl count\n\
+         blog_server ctl count\n  \
+         blog_server ctl pair [device_name]     # 生成可信设备15分钟单次配对链接/码\n  \
+         blog_server ctl devices               # 列出所有已授权的可信设备\n  \
+         blog_server ctl revoke <device_id>    # 吊销指定设备的远程访问权限\n  \
+         blog_server ctl likes                 # 查看全站文章点赞统计\n\
          环境变量: BLOG_DB (默认 ./blog.db)"
     );
 }
@@ -305,6 +309,55 @@ pub fn run(args: &[String]) {
         "count" => {
             let db = open_db();
             println!("{}", db.count());
+        }
+        "pair" => {
+            let name = rest.first().map(|s| s.as_str()).unwrap_or("移动端设备");
+            let db = open_db();
+            match db.create_pair_code(name, 15 * 60) {
+                Ok(code) => {
+                    println!("============================================================");
+                    println!("可信平台/设备单次配对码已生成（15 分钟内有效，单次使用即销毁）：");
+                    println!("设备标识: {}", name);
+                    println!("配对密钥: {}", code);
+                    println!("一键配对链接: https://jerry-hang.blog/?pair={}", code);
+                    println!("请在您的手机或受信任电脑的浏览器中打开上述链接完成配对。");
+                    println!("配对完成后，博客顶栏将自动显示后台管理入口。");
+                    println!("============================================================");
+                }
+                Err(e) => eprintln!("生成配对码失败: {e}"),
+            }
+        }
+        "devices" => {
+            let db = open_db();
+            let devices = db.list_trusted_devices();
+            println!("{:<4} {:<34} {:<16} {:<20} {:<20} {}", "ID", "DEVICE_ID", "NAME", "CREATED_AT", "LAST_SEEN", "STATUS");
+            for d in &devices {
+                let status = if d.is_active { "信任 (活跃)" } else { "已吊销" };
+                println!("{:<4} {:<34} {:<16} {:<20} {:<20} {}", d.id, d.device_id, d.name, d.created_at, d.last_seen, status);
+            }
+            println!("共 {} 台授权设备", devices.len());
+        }
+        "revoke" => {
+            let dev_id = rest.first().cloned().unwrap_or_default();
+            if dev_id.is_empty() {
+                eprintln!("用法: blog_server ctl revoke <device_id>");
+                std::process::exit(2);
+            }
+            let db = open_db();
+            match db.revoke_trusted_device(&dev_id) {
+                Ok(()) => println!("设备已成功吊销信任: {}", dev_id),
+                Err(e) => eprintln!("吊销失败: {e}"),
+            }
+        }
+        "likes" => {
+            let db = open_db();
+            let summary = db.all_likes_summary();
+            let total = db.total_likes();
+            println!("{:<32} {}", "SLUG", "LIKES");
+            for (slug, count) in &summary {
+                println!("{:<32} {}", slug, count);
+            }
+            println!("全站总点赞数: {}", total);
         }
         _ => {
             usage();

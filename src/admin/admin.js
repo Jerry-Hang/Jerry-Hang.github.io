@@ -286,18 +286,170 @@
     }
   }
 
-  async function loadSystem() {
+    async function loadSystem() {
     try {
       const d = await api('/api/admin/system');
       setVal($('k-cpu'), (d.cpu_percent ?? 0) + '%');
-      setVal($('k-rss'), humanBytes((d.rss_kb ?? 0) * 1024));
+      const rssKb = d.rss_kb ?? 0;
+      setVal($('k-rss'), humanBytes(rssKb * 1024));
       setVal($('k-db'), humanBytes(d.db_size_bytes ?? 0));
-      setVal($('k-up'), humanDuration(d.uptime_secs ?? 0));
       setVal($('k-posts'), d.posts ?? 0);
       setVal($('k-sess'), d.session_count ?? 0);
       setVal($('k-gate'), (d.gate_active ?? 0) + ' / ' + (d.gate_limit ?? 0));
+      setVal($('k-likes'), d.total_likes ?? 0);
+      setVal($('k-devs'), d.trusted_devices ?? 0);
+
+      // CGroup 内存熔断阻尼监控（硬限 512MB，限流点 384MB，恢复点 256MB）
+      const rssMb = (rssKb / 1024).toFixed(1);
+      setVal($('mem-cur'), rssMb + ' MB / 512 MB');
+      const memPct = Math.min(100, Math.max(4, (rssKb / (512 * 1024)) * 100));
+      const memBar = $('mem-bar');
+      const memStatus = $('k-mem-status');
+      if (memBar) {
+        memBar.style.width = memPct + '%';
+        if (rssKb >= 384 * 1024) {
+          memBar.style.background = 'var(--red, #ff3b30)';
+          if (memStatus) {
+            memStatus.textContent = '阻尼限流中（已超 384MB）';
+            memStatus.style.color = 'var(--red, #ff3b30)';
+          }
+        } else if (rssKb >= 256 * 1024) {
+          memBar.style.background = 'var(--orange, #ff9500)';
+          if (memStatus) {
+            memStatus.textContent = '平稳监控（高于 256MB）';
+            memStatus.style.color = 'var(--orange, #ff9500)';
+          }
+        } else {
+          memBar.style.background = 'var(--blue, #007aff)';
+          if (memStatus) {
+            memStatus.textContent = '满血极速模式（正常）';
+            memStatus.style.color = 'var(--green, #34c759)';
+          }
+        }
+      }
     } catch (e) {
       if (e.message !== 'unauthorized') console.warn('loadSystem', e);
+    }
+  }
+
+  /* ------------------------------------------------------------ 可信设备 */
+
+  let devices = [];
+
+  async function loadDevices() {
+    try {
+      const d = await api('/api/admin/devices');
+      devices = d.devices || [];
+      setVal($('dev-count'), '(' + devices.length + ')');
+      renderDevices();
+    } catch (e) {
+      if (e.message !== 'unauthorized') console.warn('loadDevices', e);
+    }
+  }
+
+  function renderDevices() {
+    const body = $('dev-body');
+    if (!body) return;
+    if (!devices.length) {
+      body.innerHTML = '<tr><td colspan="6"><div class="empty">暂无授权的可信设备</div></td></tr>';
+      return;
+    }
+    body.innerHTML = devices.map(d =>
+      '<tr>' +
+        '<td><b>' + esc(d.name) + '</b></td>' +
+        '<td class="mono" style="font-size:12px">' + esc(d.device_id) + '</td>' +
+        '<td class="mono" style="font-size:12px">' + esc(d.created_at) + '</td>' +
+        '<td class="mono" style="font-size:12px">' + esc(d.last_seen) + '</td>' +
+        '<td>' + (d.is_active ? '<span class="tag normal">已信任</span>' : '<span class="tag bruteforce">已吊销</span>') + '</td>' +
+        '<td>' + (d.is_active ? '<button class="btn small danger" data-revoke="' + esc(d.device_id) + '">吊销信任</button>' : '<span style="color:var(--fg-3);font-size:12px">已停用</span>') + '</td>' +
+      '</tr>'
+    ).join('');
+  }
+
+  async function revokeDevice(deviceId) {
+    if (!confirm('确定要吊销此设备的受信任权限吗？吊销后该设备将无法通过远程访问博客后台。')) return;
+    try {
+      await api('/api/admin/revoke-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId })
+      });
+      flash('已成功吊销设备信任权限', 'ok');
+      await loadDevices();
+      await loadSystem();
+    } catch (e) {
+      flash('吊销失败：' + e.message, 'err');
+    }
+  }
+
+  async function generatePairCode() {
+    const input = $('dev-name-input');
+    const name = input ? input.value.trim() || '移动端设备' : '移动端设备';
+    const btn = $('btn-gen-pair');
+    if (btn) btn.disabled = true;
+    try {
+      const d = await api('/api/admin/pair-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, ttl_secs: 900 })
+      });
+      const resBox = $('pair-result');
+      const urlText = $('pair-url-text');
+      if (resBox && urlText) {
+        urlText.textContent = d.url;
+        resBox.style.display = 'block';
+      }
+      flash('临时配对链接已生成，15分钟内有效', 'ok');
+    } catch (e) {
+      flash('生成配对码失败：' + e.message, 'err');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /* ------------------------------------------------------------ 拦截与封禁 IP */
+
+  let bannedIps = [];
+
+  async function loadBanned() {
+    try {
+      const d = await api('/api/admin/banned');
+      bannedIps = d.banned || [];
+      setVal($('banned-count'), '(' + bannedIps.length + ')');
+      renderBanned();
+    } catch (e) {
+      if (e.message !== 'unauthorized') console.warn('loadBanned', e);
+    }
+  }
+
+  function renderBanned() {
+    const body = $('banned-body');
+    if (!body) return;
+    if (!bannedIps.length) {
+      body.innerHTML = '<tr><td colspan="4"><div class="empty">当前无处于封禁状态的 IP</div></td></tr>';
+      return;
+    }
+    body.innerHTML = bannedIps.map(b =>
+      '<tr>' +
+        '<td class="mono"><b>' + esc(b.ip) + '</b></td>' +
+        '<td>' + b.remaining_secs + ' 秒</td>' +
+        '<td><span class="tag bruteforce">自动熔断拦截</span></td>' +
+        '<td><button class="btn small" data-unban="' + esc(b.ip) + '">立即解封</button></td>' +
+      '</tr>'
+    ).join('');
+  }
+
+  async function unbanIp(ip) {
+    try {
+      await api('/api/admin/unban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: ip })
+      });
+      flash('已解除对 IP ' + ip + ' 的封禁', 'ok');
+      await loadBanned();
+    } catch (e) {
+      flash('解封失败：' + e.message, 'err');
     }
   }
 
@@ -543,7 +695,7 @@
 
   /* ------------------------------------------------------------ 视图切换 */
 
-  const VIEWS = ['dash', 'posts', 'security', 'logs'];
+  const VIEWS = ['dash', 'posts', 'devices', 'security', 'logs'];
 
   function showView(name, push) {
     if (VIEWS.indexOf(name) < 0) name = 'dash';
@@ -556,10 +708,14 @@
     });
     if (push !== false) history.replaceState(null, '', '#' + name);
 
-    // 切回来时重画图表（隐藏状态下 canvas 尺寸为 0）
+    // 切回来时重画图表或刷新数据
     if (name === 'dash') {
       if (charts.hourly) charts.hourly();
       if (charts.daily) charts.daily();
+    } else if (name === 'devices') {
+      loadDevices();
+    } else if (name === 'security') {
+      loadBanned();
     }
   }
 
@@ -577,6 +733,40 @@
       try { await fetch('/api/logout', { method: 'POST' }); } catch (_) {}
       location.replace('/login');
     });
+
+    // 设备配对与吊销
+    const btnPair = $('btn-gen-pair');
+    if (btnPair) btnPair.addEventListener('click', generatePairCode);
+
+    const btnCopyPair = $('btn-copy-pair-url');
+    if (btnCopyPair) {
+      btnCopyPair.addEventListener('click', () => {
+        const text = ($('pair-url-text') || {}).textContent || '';
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => flash('已复制配对链接到剪贴板', 'ok')).catch(() => flash('复制失败，请手动选择', 'err'));
+        } else {
+          flash('已生成配对链接：' + text, 'ok');
+        }
+      });
+    }
+
+    const devTable = $('dev-table');
+    if (devTable) {
+      devTable.addEventListener('click', e => {
+        const rev = e.target.closest('[data-revoke]');
+        if (rev) revokeDevice(rev.dataset.revoke);
+      });
+    }
+
+    // IP 解封
+    const bannedTable = $('banned-table');
+    if (bannedTable) {
+      bannedTable.addEventListener('click', e => {
+        const unb = e.target.closest('[data-unban]');
+        if (unb) unbanIp(unb.dataset.unban);
+      });
+    }
 
     // 文章
     const ps = $('p-save');
@@ -643,14 +833,12 @@
       }, 160);
     });
 
-    // 监听 hash 变化。
-    // 没有这个的话，浏览器前进/后退、以及外部直接改 #posts 这种
-    // 「同文档导航」都不会切标签——页面不会重新加载，也就不会重跑 boot()。
+    // 监听 hash 变化
     window.addEventListener('hashchange', () => {
       showView((location.hash || '').replace('#', '') || 'dash', false);
     });
 
-    // 跟随系统深色模式切换时重画（颜色取自 CSS 变量）
+    // 跟随系统深色模式切换时重画
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (stats) {
@@ -689,10 +877,13 @@
     loadStats();
     loadSystem();
     loadPosts();
+    loadDevices();
+    loadBanned();
     loadLogs();
 
     setInterval(loadStats, 10000);
     setInterval(loadSystem, 10000);
+    setInterval(loadBanned, 10000);
   }
 
   if (document.readyState === 'loading') {

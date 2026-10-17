@@ -45,6 +45,17 @@ pub struct LogRow {
     pub category: String,
 }
 
+#[derive(Clone, serde::Serialize)]
+pub struct TrustedDeviceRow {
+    pub id: i64,
+    pub device_id: String,
+    pub name: String,
+    pub pubkey: String,
+    pub created_at: String,
+    pub last_seen: String,
+    pub is_active: bool,
+}
+
 pub struct Db {
     pub conn: Mutex<Connection>,
     pub path: PathBuf,
@@ -457,6 +468,29 @@ impl Db {
                tier TEXT NOT NULL,\
                expires_at INTEGER NOT NULL\
              );\
+             CREATE TABLE IF NOT EXISTS post_likes (\
+               id INTEGER PRIMARY KEY AUTOINCREMENT,\
+               slug TEXT NOT NULL,\
+               ip TEXT NOT NULL,\
+               count INTEGER NOT NULL DEFAULT 1,\
+               updated_at TEXT NOT NULL,\
+               UNIQUE(slug, ip)\
+             );\
+             CREATE TABLE IF NOT EXISTS trusted_devices (\
+               id INTEGER PRIMARY KEY AUTOINCREMENT,\
+               device_id TEXT UNIQUE NOT NULL,\
+               name TEXT NOT NULL,\
+               pubkey TEXT NOT NULL,\
+               created_at TEXT NOT NULL,\
+               last_seen TEXT NOT NULL,\
+               is_active INTEGER NOT NULL DEFAULT 1\
+             );\
+             CREATE TABLE IF NOT EXISTS device_pair_codes (\
+               code TEXT PRIMARY KEY,\
+               name TEXT NOT NULL,\
+               expires_at INTEGER NOT NULL\
+             );\
+             CREATE INDEX IF NOT EXISTS idx_likes_slug ON post_likes(slug);\
              CREATE INDEX IF NOT EXISTS idx_logs_scope_id ON request_logs(scope, id DESC);\
              CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON request_logs(timestamp);\
              CREATE INDEX IF NOT EXISTS idx_logs_category ON request_logs(category);\
@@ -938,6 +972,179 @@ impl Db {
         }
         out
     }
+
+    // ---- 互动与点赞 ----
+
+    pub fn add_like(&self, slug: &str, ip: &str) -> Result<i64, String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO post_likes(slug, ip, count, updated_at) \
+             VALUES(?1, ?2, 1, datetime('now')) \
+             ON CONFLICT(slug, ip) DO UPDATE SET count=count+1, updated_at=datetime('now')",
+            params![slug, ip],
+        ).map_err(|e| e.to_string())?;
+
+        let total: i64 = conn.query_row(
+            "SELECT COALESCE(SUM(count), 0) FROM post_likes WHERE slug=?1",
+            params![slug],
+            |r| r.get(0),
+        ).unwrap_or(0);
+        Ok(total)
+    }
+
+    pub fn get_likes(&self, slug: &str) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COALESCE(SUM(count), 0) FROM post_likes WHERE slug=?1",
+            params![slug],
+            |r| r.get(0),
+        ).unwrap_or(0)
+    }
+
+    pub fn total_likes(&self) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COALESCE(SUM(count), 0) FROM post_likes",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0)
+    }
+
+    pub fn all_likes_summary(&self) -> Vec<(String, i64)> {
+        let conn = self.conn.lock().unwrap();
+        let mut out = Vec::new();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT slug, COALESCE(SUM(count), 0) FROM post_likes GROUP BY slug ORDER BY SUM(count) DESC"
+        ) {
+            if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))) {
+                for r in rows.flatten() {
+                    out.push(r);
+                }
+            }
+        }
+        out
+    }
+
+    // ---- 可信平台与设备公私钥配对管理 ----
+
+    pub fn create_pair_code(&self, name: &str, ttl_secs: i64) -> Result<String, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut buf = [0u8; 32];
+        if getrandom::getrandom(&mut buf).is_err() {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0);
+            for (i, b) in buf.iter_mut().enumerate() {
+                *b = (nanos.wrapping_add(i as u64) & 0xff) as u8;
+            }
+        }
+        let code: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let expires_at = now + ttl_secs;
+        conn.execute(
+            "INSERT INTO device_pair_codes(code, name, expires_at) VALUES(?1, ?2, ?3)",
+            params![code, name, expires_at],
+        ).map_err(|e| e.to_string())?;
+        Ok(code)
+    }
+
+    pub fn verify_and_consume_pair_code(&self, code: &str, device_id: &str, pubkey: &str) -> Result<String, String> {
+        let conn = self.conn.lock().unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let name: String = conn.query_row(
+            "SELECT name FROM device_pair_codes WHERE code=?1 AND expires_at > ?2",
+            params![code, now],
+            |r| r.get(0),
+        ).map_err(|_| "配对码无效或已过期".to_string())?;
+
+        let _ = conn.execute("DELETE FROM device_pair_codes WHERE code=?1", params![code]);
+
+        conn.execute(
+            "INSERT INTO trusted_devices(device_id, name, pubkey, created_at, last_seen, is_active) \
+             VALUES(?1, ?2, ?3, datetime('now'), datetime('now'), 1) \
+             ON CONFLICT(device_id) DO UPDATE SET name=?2, pubkey=?3, last_seen=datetime('now'), is_active=1",
+            params![device_id, name, pubkey],
+        ).map_err(|e| e.to_string())?;
+
+        Ok(name)
+    }
+
+    pub fn is_trusted_device(&self, device_id: &str) -> bool {
+        let conn = self.conn.lock().unwrap();
+        let active: Option<i64> = conn.query_row(
+            "SELECT is_active FROM trusted_devices WHERE device_id=?1",
+            params![device_id],
+            |r| r.get(0),
+        ).ok();
+        active == Some(1)
+    }
+
+    pub fn touch_device(&self, device_id: &str) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute(
+            "UPDATE trusted_devices SET last_seen=datetime('now') WHERE device_id=?1",
+            params![device_id],
+        );
+    }
+
+    pub fn list_trusted_devices(&self) -> Vec<TrustedDeviceRow> {
+        let conn = self.conn.lock().unwrap();
+        let mut out = Vec::new();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, device_id, name, pubkey, created_at, last_seen, is_active FROM trusted_devices ORDER BY id DESC"
+        ) {
+            if let Ok(rows) = stmt.query_map([], |r| {
+                Ok(TrustedDeviceRow {
+                    id: r.get(0)?,
+                    device_id: r.get(1)?,
+                    name: r.get(2)?,
+                    pubkey: r.get(3)?,
+                    created_at: r.get(4)?,
+                    last_seen: r.get(5)?,
+                    is_active: r.get::<_, i64>(6)? == 1,
+                })
+            }) {
+                for r in rows.flatten() {
+                    out.push(r);
+                }
+            }
+        }
+        out
+    }
+
+    pub fn revoke_trusted_device(&self, device_id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE trusted_devices SET is_active=0 WHERE device_id=?1",
+            params![device_id],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn trusted_device_count(&self) -> i64 {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT COUNT(*) FROM trusted_devices WHERE is_active=1",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0)
+    }
+
+    pub fn delete_expired_pair_codes(&self) {
+        let conn = self.conn.lock().unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let _ = conn.execute("DELETE FROM device_pair_codes WHERE expires_at <= ?1", params![now]);
+    }
 }
 
 #[cfg(test)]
@@ -1010,5 +1217,69 @@ mod tests {
         let html3 = render_markdown(md3);
         assert!(!html3.contains("onerror"), "内联事件属性必须被剥离: {html3}");
     }
+
+    #[test]
+    fn test_post_likes() {
+        let dir = std::env::temp_dir().join(format!("test_blog_likes_{}.db", std::process::id()));
+        let db = Db::open(&dir).unwrap();
+
+        // 初始赞数
+        assert_eq!(db.get_likes("hello-world"), 0);
+        assert_eq!(db.total_likes(), 0);
+
+        // IP1 点赞
+        let l1 = db.add_like("hello-world", "1.1.1.1").unwrap();
+        assert_eq!(l1, 1);
+        assert_eq!(db.get_likes("hello-world"), 1);
+
+        // 同一 IP 再次点赞，计数递增
+        let l2 = db.add_like("hello-world", "1.1.1.1").unwrap();
+        assert_eq!(l2, 2);
+
+        // IP2 点赞不同文章
+        db.add_like("rust-tips", "2.2.2.2").unwrap();
+        assert_eq!(db.get_likes("rust-tips"), 1);
+        assert_eq!(db.total_likes(), 3);
+
+        let summary = db.all_likes_summary();
+        assert_eq!(summary.len(), 2);
+        assert_eq!(summary[0], ("hello-world".to_string(), 2));
+        assert_eq!(summary[1], ("rust-tips".to_string(), 1));
+
+        let _ = std::fs::remove_file(&dir);
+    }
+
+    #[test]
+    fn test_trusted_device_lifecycle() {
+        let dir = std::env::temp_dir().join(format!("test_blog_devs_{}.db", std::process::id()));
+        let db = Db::open(&dir).unwrap();
+
+        // 生成配对码
+        let code = db.create_pair_code("Jerry Phone", 300).unwrap();
+        assert_eq!(code.len(), 64);
+
+        // 错误码应拒绝
+        assert!(db.verify_and_consume_pair_code("wrong-code", "dev-123", "key-abc").is_err());
+
+        // 正确消费配对码
+        let name = db.verify_and_consume_pair_code(&code, "dev-123", "key-abc").unwrap();
+        assert_eq!(name, "Jerry Phone");
+
+        // 单次消费：再次消费必须失败
+        assert!(db.verify_and_consume_pair_code(&code, "dev-123", "key-abc").is_err());
+
+        // 校验设备有效性
+        assert!(db.is_trusted_device("dev-123"));
+        assert!(!db.is_trusted_device("dev-unknown"));
+        assert_eq!(db.trusted_device_count(), 1);
+
+        // 吊销权限
+        db.revoke_trusted_device("dev-123").unwrap();
+        assert!(!db.is_trusted_device("dev-123"));
+        assert_eq!(db.trusted_device_count(), 0);
+
+        let _ = std::fs::remove_file(&dir);
+    }
 }
+
 

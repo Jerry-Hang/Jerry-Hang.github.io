@@ -43,19 +43,22 @@
 
 ### 安全隔离与访问控制
 
-**双端口物理隔离与最小权限原则**是本项目最重要的设计：
+**双端口物理隔离、可信设备配对与最小权限原则**是本项目最重要的设计：
 
-| | 公网口 `0.0.0.0:80`（或 8090） | 管理通道（SSH + CLI / 本机回环） |
+| | 公网口 `0.0.0.0:80`（或 8090） | 管理通道（SSH + CLI / 本机回环 / 可信配对） |
 |---|---|---|
-| 谁能访问 | 任何人（只读/查询） | 仅经过 SSH 公私钥配对受信任的设备 |
-| 允许方法 | **仅 `GET` / `HEAD`**，非只读（POST/PUT/DELETE等）一律 `404` | CLI 直接操作数据库，无 Web 注入面 |
-| API | **无**（`/api/*`、`/admin` 在公网直接 404） | 本地 `blog_server ctl` CLI 命令集 |
-| 认证机制 | 无需认证 | **仅限 SSH Ed25519 密钥配对**（禁用密码认证） |
-| 并发门控 | 有（超限 `503`，带 IP 频率限流） | 免门控 |
+| 谁能访问 | 任何人（只读/查询/文章互动）；可信配对设备可访问后台 | 仅经过 SSH 公私钥配对受信任的设备 |
+| 允许方法 | 未配对：**仅 `GET` / `HEAD`** 与受控点赞/配对 API，其余一律 `404`；已配对设备放行受鉴权管理接口 | CLI 直接操作数据库；或已配对设备受控鉴权访问 |
+| 后台入口 | **全网 404 伪装隐身**（未配对请求统一 404）；已配对设备顶栏动态呈现「后台」按钮 | 本地 `blog_server ctl` CLI 命令集 / 回环管理口 |
+| 认证机制 | 可信设备单次令牌配对（`blog_server ctl pair`）+ 密码哈希认证 | **仅限 SSH Ed25519 密钥配对**（禁用密码认证） |
+| 并发门控 | 有（超限 `503`，带 IP 频率限流与配对防爆破） | 免门控 |
 
-> 🔒 **彻底消除跳板与命令执行后门**：
-> 彻底移除 Web 端 `/api/admin/exec`（执行系统命令）与 `/api/admin/file`（任意绝对路径读取）。二进制内不包含任何 `sh -c` 执行逻辑，**杜绝任何以博客为跳板控制 VPS 的风险**。
-> 公网访问不显示任何管理入口与跳板 UI，外部探测后台统一返回 404。
+> 🔒 **可信设备配对与 404 伪装隐身后台（零资产暴露面）**：
+> - 外部扫描器、黑客探测或非受信任设备访问 `/admin`、`/login`、`/_admin/*`、`/api/admin/*` 统一伪装返回 **`404 Not Found`**（绝不返回 401/403），外部完全无法感知后台管理界面的存在。
+> - 管理员可在 SSH 终端运行 `blog_server ctl pair [设备名]` 生成 15 分钟单次有效的专属安全配对链接（如 `https://your-domain/?pair=...`）。手机或电脑打开后自动完成安全握手并写入 `blog_trusted` 凭证。
+> - 配对成功后，顶栏导航自动呈现专属「后台」灵动胶囊按钮；管理员亦可随时在后台或 SSH 命令行一键吊销设备，吊销后立即重归 404 隐身状态。
+> - 配对接口（`/api/auth/pair-device`）内置防暴力破解机制：严格限制单 IP 请求频率，3 次配对失败立即锁定封禁该 IP 5 分钟。
+> - 彻底移除 Web 端 `/api/admin/exec`（执行系统命令）与 `/api/admin/file`（任意绝对路径读取）。二进制内不包含任何 `sh -c` 执行逻辑，**杜绝任何以博客为跳板控制 VPS 的风险**。
 
 ### 资源防护与多级内存熔断
 
@@ -91,7 +94,7 @@
 - **Markdown 安全渲染**：`pulldown-cmark` 渲染后经**白名单净化器**过滤
 - **自动清理**：正常日志留 30 天，安全日志留 90 天，每天 `wal_checkpoint(TRUNCATE)`
 
-### 请求日志与威胁监控
+### 请求日志、后台监控与威胁防御
 
 `request_logs` 表按规则自动归类记录：
 
@@ -103,13 +106,21 @@
 | `401` | `bruteforce` |
 | 其他 | `normal` |
 
-后台可使用 `blog_server ctl logs` 命令按分类、IP 等维度审计真实访问轨迹。
+后台面板与 CLI 提供全方位的防御管理与运维遥测：
+- **CGroup 内存水位仪表盘**：可视化展示当前真实 RSS 内存占用，并实时标注 256MB 满血基线、384MB 减半限流线与 512MB 熔断红线。
+- **动态封禁防护与一键解封（Unban）**：安全面板实时展示当前被限制器封禁的恶意扫描/爬虫 IP 及解封倒计时，支持后台管理员一键解除封禁。
+- **可信设备生命周期管理**：后台专设「设备」面板，支持在线生成临时配对码、审计所有已授权受信任设备列表与一键吊销设备权限。
+- **全站互动与获赞 KPI**：概览页集中展示全站点赞互动总数与受信任设备数，并支持按文章统计点赞热度。
+- **命令行审计**：支持在 SSH 终端通过 `blog_server ctl logs`、`blog_server ctl devices`、`blog_server ctl likes` 快速审计与管理。
 
 ### 交互体验与前端视觉
 
 - **瑞士国际平面风格（Swiss Style）与排版美学**：融合苏黎世派严谨的网格式排版、高对比度黑白灰层级、Neo-Grotesque 无衬线字体序列（`-apple-system, Helvetica Neue, Arial`）与充裕而克制的留白，杜绝花哨繁杂的 AI 生成模板味。
 - **摒弃表情符号与花哨装饰**：全站坚决杜绝 Unicode Emoji、花哨霓虹渐变与杂乱符号堆叠；统一采用纯 CSS / 1.5px 精细矢量线框 SVG 图标，保持界面冷静、严谨、现代。
 - **保留原生 iOS 毛玻璃质感**：采用多层 `backdrop-filter: blur(28px)`、高动态微反光边框与灵动胶囊导航组件，搭配触控微阻尼过渡，在移动端与桌面端兼具通透感与温润质感。
+- **文章轻量互动点赞**：文章末尾集成 iOS 灵动胶囊点赞模块，支持心跳缩放动效、持久化状态记忆与防重复刷赞，后端支持并发安全原子递增。
+- **零依赖纯本地矢量二维码分享**：文章末尾集成离线分享弹窗，内置纯原生 JavaScript 矢量 QR Code 生成算法（Reed-Solomon 纠错与多项式数学运算），100% 离线生成纯 SVG 矢量码，无需任何外部在线 API 或 CDN，彻底消除隐私泄露。
+- **受信任设备无缝后台入口**：受信任设备访问博客时，顶栏动态注入「后台」灵动胶囊按钮；未配对访客则完全不可见且无法探测后台。
 - **全局即时搜索（Command Palette）**：支持 `Ctrl+K` / `Cmd+K` 或点击顶栏放大镜实时呼出，纯原生 JS 毫秒级模糊匹配标题、摘要、标签、分类及正文片段，支持关键词高亮与方向键/Enter键盘顺畅导航。
 - **友链展示（Blogroll）与一键交换**：专设友链视图，网格化展示站点卡片与站长头像，附带一键复制本站申请信息交互。
 - **代码块一键复制与微动画**：代码段右上角集成一键复制按钮与已复制状态反馈，阅读体验顺畅自然。
@@ -222,30 +233,41 @@ push / PR 到 `main` 时自动执行：
 `Router::new().fallback(<handler>)`，所有路由在
 `external_dispatch` / `local_dispatch` 里**手工字符串比对分发**。
 
-**公网口**（只接受 `GET` / `HEAD`）：
+**公网口**（只读、受控互动与受信任设备管理通道）：
 
-| 路径 | 行为 |
-|---|---|
-| `/posts.json` | 全部文章的 JSON 数组 |
-| `/post/{slug}` | 单篇文章 HTML 页（内联样式） |
-| 其他任何路径 | 静态文件，目录则取 `index.html` |
-| 非 GET/HEAD | `404` |
+| 路径 | 方法 | 行为 |
+|---|---|---|
+| `/posts.json` | GET/HEAD | 全部文章的 JSON 数组 |
+| `/post/{slug}` | GET/HEAD | 单篇文章 HTML 页（内联样式） |
+| `/api/posts/{slug}/likes` | GET/HEAD, POST | 点赞数据获取 / 递增（带 IP 频控防刷） |
+| `/api/likes/summary` | GET/HEAD | 全站点赞总数摘要 |
+| `/api/auth/check` | GET/HEAD | 客户端探测是否为受信任设备（决定是否渲染「后台」按钮） |
+| `/api/auth/pair-device` | POST | 提交配对口令激活设备（严格防爆破频控，3 次失败封禁 IP） |
+| 静态文件 | GET/HEAD | 严格白名单内静态资源 |
+| `/admin`, `/login`, `/api/admin/*` 等 | * | **受信任设备**：无缝直通后台；<br>**非受信任访问**：**统一返回 `404` 隐身伪装** |
+| 非法/未放行方法 | * | `404` |
 
-**管理口**（先校验 peer 是 loopback，否则 `403`）：
+**管理口 / 可信设备通道**（管理口校验 peer 为 loopback；公网直通校验 `blog_trusted`）：
 
 | 路径 | 方法 | 说明 |
 |---|---|---|
-| `/api/login` | POST | JSON 登录 |
+| `/api/login` | POST | JSON 登录（校验密码哈希并签发 `blog_admin` 会话） |
 | `/api/logout` | * | 删除服务端会话 + 清 Cookie |
-| `/login` | GET | 登录页（已登录则 302 → `/`） |
-| `/` | GET | 管理仪表盘（未登录 302 → `/login`） |
-| `/api/posts` | GET/POST | 列表 / 新建 |
-| `/api/posts/{id}` | PUT/DELETE | 更新 / 删除 |
-| `/api/search?q=` | * | 搜索 |
+| `/login` | GET | 登录页（已登录则 302 → `/admin`） |
+| `/` 或 `/admin` | GET | 管理仪表盘（未登录 302 → `/login`） |
+| `/api/posts` | GET/POST | 列表 / 新建文章 |
+| `/api/posts/{id}` | PUT/DELETE | 更新 / 删除文章 |
+| `/api/search?q=` | * | 搜索文章 |
 | `/api/status` | * | 文章数 + 库大小 |
 | `/api/admin/logs` | * | 请求日志（分页/分类/IP/方法过滤） |
 | `/api/admin/stats` | * | 今日总量、分类统计、高峰时段、分布 |
-| `/api/admin/system` | * | CPU、RSS、库大小、运行时长、会话数、门控状态 |
+| `/api/admin/system` | * | CPU、RSS、CGroup 水位、库大小、运行时长、会话数 |
+| `/api/admin/devices` | GET | 获取所有受信任设备授权列表 |
+| `/api/admin/pair-code` | POST | 后台在线生成 15 分钟临时单次配对码 |
+| `/api/admin/revoke-device`| POST | 实时吊销指定设备的远程访问权限 |
+| `/api/admin/banned` | GET | 查询当前实时被封禁的 IP 清单与解封倒计时 |
+| `/api/admin/unban` | POST | 手动解除指定 IP 的封禁限制 |
+| `/api/admin/likes` | GET | 获取全站文章互动获赞统计明细 |
 
 > 🔒 **注**：原 `/api/admin/exec`（执行系统命令）与 `/api/admin/file`（任意路径读取）接口已被彻底移除，二进制内零 `sh -c` 调用，杜绝任何利用博客作为跳板控制 VPS 的风险。
 
@@ -294,19 +316,62 @@ sessions (
   tier TEXT NOT NULL,               -- admin / priv
   expires_at INTEGER NOT NULL       -- unix 秒
 )
+
+post_likes (
+  slug TEXT PRIMARY KEY,            -- 文章 slug
+  count INTEGER NOT NULL DEFAULT 0, -- 获赞总数
+  updated_at TEXT NOT NULL
+)
+
+trusted_devices (
+  id TEXT PRIMARY KEY,              -- 32 位十六进制设备标识（由服务端安全随机生成）
+  device_name TEXT NOT NULL,        -- 设备备注（如「管理员的手机」）
+  created_at INTEGER NOT NULL,      -- 配对时间（unix 秒）
+  last_active INTEGER NOT NULL,     -- 最近活跃时间
+  is_active INTEGER NOT NULL DEFAULT 1 -- 是否有效（0 为已吊销）
+)
+
+device_pair_codes (
+  code TEXT PRIMARY KEY,            -- 64 位十六进制单次配对令牌
+  device_name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,      -- 默认 15 分钟失效
+  is_used INTEGER NOT NULL DEFAULT 0 -- 单次消费保证（0 未用，1 已用）
+)
 ```
 
-> **`scope` 列是后加的**，`Db::open` 里有迁移逻辑：
-> 检查 `pragma_table_info` 有没有该列，没有就 `ALTER TABLE` 补上，
-> 然后用 SQL `CASE` 回填历史数据。
->
 > **数据库索引优化**：
-> `request_logs` 表已内置复合与单列索引：
+> 已在 SQLite 中全量建立以下高性能索引：
 > - `idx_logs_scope_id`：加速公网日志按 ID 倒序分页查询；
 > - `idx_logs_timestamp`：加速按时间范围统计与 30/90 天自动修剪；
 > - `idx_logs_category`：加速分类统计与恶意行为过滤；
-> - `idx_logs_ip`：加速 IP 频率统计与恶意扫描封禁追踪。
-> 保证在几十万级日志量下查询与清理依然毫秒级响应。
+> - `idx_logs_ip`：加速 IP 频率统计与恶意扫描封禁追踪；
+> - `idx_likes_slug`：加速文章点赞查询与自增更新；
+> - `idx_trusted_devices_active`：加速受信任设备在线鉴权过滤。
+> 保证在几十万级数据量下查询与清理依然毫秒级响应。
+### `blog_server ctl`：服务端命令行控制台（SSH 专属运维工具）
+
+本项目支持通过 SSH 登录 VPS 或主机后，直接使用 `blog_server ctl` 进行无网关依赖的本地运维与管理：
+
+```bash
+# 文章直接管理
+blog_server ctl list                                    # 列出全部文章及 ID/Slug
+blog_server ctl show <id|slug>                          # 查看指定文章正文与元数据
+blog_server ctl new --title "标题" --slug "my-slug"     # 快速新建文章
+blog_server ctl edit <id> --title "新标题"              # 编辑已有文章
+blog_server ctl rm <id>                                 # 删除文章
+blog_server ctl import <dir> [--force]                  # 从 Markdown 目录批量导入
+
+# 可信设备管理与后台配对
+blog_server ctl pair [设备备注名]                       # 生成 15 分钟单次配对链接与配对码（如配对手机）
+blog_server ctl devices                                 # 查看当前已授权受信任设备列表
+blog_server ctl revoke <device_id>                      # 实时吊销指定设备的远程访问权限
+
+# 遥测、日志与互动
+blog_server ctl logs [--cat C] [--ip I] [--page N]      # 分类/IP 审计真实访问日志
+blog_server ctl likes                                   # 查看全站文章点赞明细与总获赞数
+blog_server ctl count                                   # 查看文章总数
+```
 
 ### `blog_ctl`：文章构建工具
 
@@ -550,10 +615,18 @@ cat /proc/$(pgrep -f blog_server)/status | grep Cpus_allowed_list
 
 ### 后台相关
 
-**点了「执行命令」弹出 Basic 认证框**
+**为什么扫描或直接访问 `/admin`、`/login` 返回 404？**
 
-**这是设计如此，不是 bug。** `blog_priv` 只能通过 HTTP Basic 获得，
-表单登录只发 `blog_admin`。
+这是**设计如此**（404 伪装隐身后台）。为了实现真正的零攻击面，任何未经 SSH 信任配对的外部请求访问 `/admin`、`/login` 或 `/api/admin/*` 均统一返回 `404 Not Found`（绝不返回 401/403），外部扫描器和恶意爬虫完全无法感知管理后台的存在。
+
+若需从手机或外部受信任设备访问后台：
+1. 通过 SSH 登录 VPS 终端运行：`blog_server ctl pair 我的手机`
+2. 使用该设备浏览器打开生成的 15 分钟单次配对链接
+3. 配对成功后顶栏自动常驻「后台」按钮，无缝登录管理控制台。
+
+**为什么移除了 Web 端的命令执行功能？**
+
+为了杜绝任何可能将博客作为提权跳板或执行任意 Shell 命令的系统安全隐患，服务端代码已彻底删除所有 `sh -c` 调用与 `/api/admin/exec` 接口。对 VPS 的系统运维全部回归到经过公私钥强加密的 SSH 终端，最小化攻击暴露面。
 
 **「前台 ↗」链接点了没反应 / 回到登录页**
 
