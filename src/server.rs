@@ -427,14 +427,77 @@ impl IpRateLimiter {
         let mut map = self.records.write().unwrap();
         Self::prune_internal(&mut map, now);
     }
+
+    /// 手动解除指定 IP 的封禁
+    fn unban(&self, ip: &str) -> bool {
+        let mut map = self.records.write().unwrap();
+        if let Some(entry) = map.get_mut(ip) {
+            entry.banned_until = None;
+            entry.req_count = 0;
+            entry.scan_count = 0;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 列出所有当前处于封禁状态的 IP 及剩余秒数
+    fn list_banned(&self) -> Vec<(String, u64)> {
+        let now = Instant::now();
+        let map = self.records.read().unwrap();
+        let mut out = Vec::new();
+        for (ip, state) in map.iter() {
+            if let Some(until) = state.banned_until {
+                if until > now {
+                    let rem = until.duration_since(now).as_secs();
+                    out.push((ip.clone(), rem));
+                }
+            }
+        }
+        out
+    }
+
+    /// 校验配对尝试频率（防止暴力探测配对密钥）
+    fn check_pair_rate(&self, ip: &str) -> Result<(), &'static str> {
+        let now = Instant::now();
+        let map = self.records.read().unwrap();
+        if let Some(state) = map.get(ip) {
+            if let Some(until) = state.banned_until {
+                if until > now {
+                    return Err("IP 处于临时限流/封禁中");
+                }
+            }
+            if state.scan_count >= 10 {
+                return Err("尝试次数过多，请稍后再试");
+            }
+        }
+        Ok(())
+    }
+
+    /// 记录配对失败，快速累积封禁计数
+    fn record_pair_fail(&self, ip: &str) {
+        let now = Instant::now();
+        let mut map = self.records.write().unwrap();
+        let entry = map.entry(ip.to_string()).or_insert_with(|| IpState {
+            window_start: now,
+            req_count: 0,
+            scan_count: 0,
+            banned_until: None,
+        });
+        entry.scan_count += 5; // 3 次失败即封禁 5 分钟
+        if entry.scan_count >= 15 {
+            entry.banned_until = Some(now + Duration::from_secs(300));
+        }
+    }
 }
 
 async fn session_cleanup(db: Arc<Db>, rate_limiter: Arc<IpRateLimiter>) {
-    // 会话过期检查：每分钟一次（原行为，保持不变）
+    // 会话与配对码过期检查：每分钟一次
     let mut last_prune = Instant::now();
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
         db.delete_expired_sessions();
+        db.delete_expired_pair_codes();
         rate_limiter.prune();
 
         // 请求日志清理：每天一次。
@@ -601,7 +664,7 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
         return resp;
     }
 
-    let resp = external_dispatch(&state, &peer, req).await;
+    let resp = external_dispatch(&state, &peer, &ip, req).await;
     if resp.status() == StatusCode::NOT_FOUND {
         state.rate_limiter.record_scan_error(&ip);
     }
@@ -609,7 +672,153 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
     resp
 }
 
-async fn external_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) -> Response {
+fn is_trusted_device_session(state: &AppState, headers: &HeaderMap) -> bool {
+    let cookies = parse_cookies(headers);
+    if let Some(tok) = cookies.get("blog_trusted") {
+        if state.db.valid_session(tok, "trusted") {
+            if let Some(dev_id) = cookies.get("blog_dev_id") {
+                if !state.db.is_trusted_device(dev_id) {
+                    return false;
+                }
+                state.db.touch_device(dev_id);
+            }
+            return true;
+        }
+    }
+    false
+}
+
+fn handle_auth_check(state: &AppState, headers: &HeaderMap) -> Response {
+    let cookies = parse_cookies(headers);
+    let mut trusted = false;
+    let mut name = String::new();
+    if let Some(tok) = cookies.get("blog_trusted") {
+        if state.db.valid_session(tok, "trusted") {
+            if let Some(dev_id) = cookies.get("blog_dev_id") {
+                if state.db.is_trusted_device(dev_id) {
+                    trusted = true;
+                    name = "已验证受信任设备".to_string();
+                    state.db.touch_device(dev_id);
+                }
+            } else {
+                trusted = true;
+                name = "已验证受信任设备".to_string();
+            }
+        }
+    }
+    json_response(StatusCode::OK, json!({
+        "trusted": trusted,
+        "name": name
+    }))
+}
+
+async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Response {
+    if let Err(msg) = state.rate_limiter.check_pair_rate(ip) {
+        return json_response(StatusCode::TOO_MANY_REQUESTS, json!({"error": msg}));
+    }
+    let body = read_json(req).await;
+    let code = body.get("code").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let dev_id = body.get("device_id").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let pubkey = body.get("pubkey").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let client_name = body.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
+
+    if code.is_empty() || dev_id.is_empty() {
+        return json_response(StatusCode::BAD_REQUEST, json!({"error": "缺少配对码或设备标识"}));
+    }
+
+    match state.db.verify_and_consume_pair_code(code, dev_id, pubkey) {
+        Ok(db_name) => {
+            let final_name = if !client_name.is_empty() { client_name } else { &db_name };
+            state.db.touch_device(dev_id);
+            let tok = random_token();
+            let _ = state.db.create_session(&tok, "trusted", 365 * 24 * 3600);
+            let mut resp = json_response(StatusCode::OK, json!({
+                "ok": true,
+                "name": final_name,
+                "device_id": dev_id
+            }));
+            let cookie_str = format!("blog_trusted={tok}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict");
+            if let Ok(h) = HeaderValue::from_str(&cookie_str) {
+                resp.headers_mut().append(header::SET_COOKIE, h);
+            }
+            let dev_cookie = format!("blog_dev_id={dev_id}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict");
+            if let Ok(h) = HeaderValue::from_str(&dev_cookie) {
+                resp.headers_mut().append(header::SET_COOKIE, h);
+            }
+            resp
+        }
+        Err(e) => {
+            state.rate_limiter.record_pair_fail(ip);
+            json_response(StatusCode::FORBIDDEN, json!({"error": e}))
+        }
+    }
+}
+
+async fn handle_post_likes_api(state: &Arc<AppState>, ip: &str, req: Request) -> Response {
+    let path = req.uri().path().to_string();
+    let method = req.method().clone();
+    let Some(rest) = path.strip_prefix("/api/posts/") else {
+        return not_found();
+    };
+    if let Some(slug) = rest.strip_suffix("/likes") {
+        if method == Method::GET || method == Method::HEAD {
+            let count = state.db.get_likes(slug);
+            return json_response(StatusCode::OK, json!({"slug": slug, "likes": count}));
+        }
+    } else if let Some(slug) = rest.strip_suffix("/like") {
+        if method == Method::POST {
+            match state.db.add_like(slug, ip) {
+                Ok(total) => {
+                    return json_response(StatusCode::OK, json!({"slug": slug, "likes": total}));
+                }
+                Err(e) => {
+                    return json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": e}));
+                }
+            }
+        }
+    }
+    not_found()
+}
+
+async fn external_dispatch(state: &Arc<AppState>, peer: &SocketAddr, ip: &str, req: Request) -> Response {
+    let path = req.uri().path().to_string();
+    let is_trusted = is_trusted_device_session(state, req.headers());
+
+    // 1. 公开互动与配对认证接口
+    if path == "/api/auth/check" {
+        return handle_auth_check(state, req.headers());
+    }
+    if path == "/api/auth/pair-device" && req.method() == Method::POST {
+        return handle_auth_pair(state, ip, req).await;
+    }
+    if path.starts_with("/api/posts/") && (path.ends_with("/likes") || path.ends_with("/like")) {
+        return handle_post_likes_api(state, ip, req).await;
+    }
+    if path == "/api/likes/summary" && (req.method() == Method::GET || req.method() == Method::HEAD) {
+        return json_response(StatusCode::OK, json!({
+            "total": state.db.total_likes(),
+            "summary": state.db.all_likes_summary()
+        }));
+    }
+
+    // 2. 管理路由与跳板防护（/admin, /login, /_admin/*, /api/admin/* 等）：
+    // 只有经过公私钥/单次配对绑定的可信设备才允许访问；
+    // 未验证访客一律返回 404 Not Found（不泄露任何后台存在信息与跳板入口）。
+    let is_admin_route = path == "/admin"
+        || path.starts_with("/admin/")
+        || path == "/login"
+        || path.starts_with("/_admin/")
+        || path.starts_with("/api/admin/")
+        || (is_trusted && (path == "/api/login" || path == "/api/logout" || (path.starts_with("/api/posts") && req.method() != Method::GET)));
+
+    if is_admin_route {
+        if !is_trusted {
+            return not_found();
+        }
+        return local_dispatch_internal(state, req, false).await;
+    }
+
+    // 3. 常规公开内容：严格限定 GET 与 HEAD，受并发熔断限制
     let method = req.method().clone();
     if method != Method::GET && method != Method::HEAD {
         return not_found();
@@ -618,9 +827,7 @@ async fn external_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Reques
         return service_unavailable();
     }
     let _guard = GateGuard(state.gate.clone());
-    let path = req.uri().path().to_string();
-    // 公网口：按 peer + Host 判断是不是本机；不是就把「查看后台」那段删掉
-    let local = is_local_access(&peer.ip(), req.headers());
+    let local = is_trusted || is_local_access(&peer.ip(), req.headers());
     read_handler(state, &path, method == Method::HEAD, local, req.headers()).await
 }
 
@@ -632,6 +839,10 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
     if !peer.ip().is_loopback() {
         return forbidden();
     }
+    local_dispatch_internal(state, req, true).await
+}
+
+async fn local_dispatch_internal(state: &Arc<AppState>, req: Request, is_loopback: bool) -> Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
     let is_get = method == Method::GET || method == Method::HEAD;
@@ -647,27 +858,22 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
     // ---- HTML 页面：未登录跳登录页（而不是 401 空白页）----
     if is_get && !path.starts_with("/api/") {
         if path == "/login" {
-            // 已登录就没必要再看登录页
+            // 已登录就没必要再看登录页，直接跳转至后台
             if session_cookies_ok(state, req.headers()).is_some() {
-                return redirect_to_home();
+                return if is_loopback { redirect_to_home() } else { redirect_to_admin() };
             }
             return login_page(req.headers(), &state.cfg.read().unwrap().username);
         }
 
         let cookies = match session_cookies_ok(state, req.headers()) {
             Some(c) => c,
-            None => return redirect_to_login(),
+            None => return if is_loopback { redirect_to_login() } else { redirect_to_login_from_admin() },
         };
 
-        let mut resp = if path == "/" {
+        let mut resp = if path == "/" || path == "/admin" || path == "/admin/" {
             admin_dashboard(req.headers())
         } else {
-            // 后台域名下不再挂公网静态文件：原来这里直接 read_handler 放行，
-            // 等于 /index.html 等路径完全绕过认证（实测无凭据返回 200）。
-            // local 仍要带 Host 判断：peer 一定是回环（本函数开头已校验），
-            // 但用 Host: 192.168.x.x 打过来模拟的是局域网访问。
-            let local = is_local_access(&peer.ip(), req.headers());
-            read_handler(state, &path, method == Method::HEAD, local, req.headers()).await
+            read_handler(state, &path, method == Method::HEAD, true, req.headers()).await
         };
         add_cookies(&mut resp, &cookies);
         return resp;
@@ -695,6 +901,24 @@ fn redirect_to_home() -> Response {
         .header(header::CACHE_CONTROL, "no-store")
         .body(Body::empty())
         .expect("build redirect home")
+}
+
+fn redirect_to_admin() -> Response {
+    Response::builder()
+        .status(StatusCode::FOUND)
+        .header(header::LOCATION, "/admin")
+        .header(header::CACHE_CONTROL, "no-store")
+        .body(Body::empty())
+        .expect("build redirect admin")
+}
+
+fn redirect_to_login_from_admin() -> Response {
+    Response::builder()
+        .status(StatusCode::FOUND)
+        .header(header::LOCATION, "/login?ref=admin")
+        .header(header::CACHE_CONTROL, "no-store")
+        .body(Body::empty())
+        .expect("build redirect login")
 }
 
 fn authorized(state: &AppState, headers: &HeaderMap) -> bool {
@@ -966,8 +1190,58 @@ async fn handle_admin_api(state: &Arc<AppState>, path: &str, req: Request) -> Re
                 "session_count": state.db.active_sessions_count(),
                 "gate_active": gate_active,
                 "gate_limit": gate_limit,
+                "trusted_devices": state.db.trusted_device_count(),
+                "total_likes": state.db.total_likes(),
             }),
         )
+    } else if path == "/api/admin/devices" {
+        let devs = state.db.list_trusted_devices();
+        json_response(StatusCode::OK, json!({"devices": devs}))
+    } else if path == "/api/admin/pair-code" {
+        let v = read_json(req).await;
+        let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("受信任设备");
+        let ttl = v.get("ttl_secs").and_then(|x| x.as_i64()).unwrap_or(900).clamp(60, 86400);
+        match state.db.create_pair_code(name, ttl) {
+            Ok(code) => {
+                let url = format!("https://jerry-hang.blog/?pair={code}");
+                json_response(StatusCode::OK, json!({
+                    "ok": true,
+                    "code": code,
+                    "name": name,
+                    "expires_in": ttl,
+                    "url": url
+                }))
+            }
+            Err(e) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": e})),
+        }
+    } else if path == "/api/admin/revoke-device" {
+        let v = read_json(req).await;
+        let dev_id = v.get("device_id").and_then(|x| x.as_str()).unwrap_or("");
+        if dev_id.is_empty() {
+            return json_response(StatusCode::BAD_REQUEST, json!({"error": "缺少 device_id"}));
+        }
+        match state.db.revoke_trusted_device(dev_id) {
+            Ok(()) => json_response(StatusCode::OK, json!({"ok": true})),
+            Err(e) => json_response(StatusCode::INTERNAL_SERVER_ERROR, json!({"error": e})),
+        }
+    } else if path == "/api/admin/banned" {
+        let banned = state.rate_limiter.list_banned();
+        let arr: Vec<serde_json::Value> = banned.into_iter().map(|(ip, rem)| {
+            json!({"ip": ip, "remaining_secs": rem})
+        }).collect();
+        json_response(StatusCode::OK, json!({"banned": arr}))
+    } else if path == "/api/admin/unban" {
+        let v = read_json(req).await;
+        let ip = v.get("ip").and_then(|x| x.as_str()).unwrap_or("");
+        let ok = state.rate_limiter.unban(ip);
+        json_response(StatusCode::OK, json!({"ok": ok}))
+    } else if path == "/api/admin/likes" {
+        let total = state.db.total_likes();
+        let summary = state.db.all_likes_summary();
+        let arr: Vec<serde_json::Value> = summary.into_iter().map(|(slug, count)| {
+            json!({"slug": slug, "count": count})
+        }).collect();
+        json_response(StatusCode::OK, json!({"total_likes": total, "posts": arr}))
     } else {
         not_found()
     }
@@ -1609,5 +1883,28 @@ mod tests {
         assert!(limiter.check_and_record(banned_ip).is_err());
         let map = limiter.records.read().unwrap();
         assert!(map.len() <= 4000);
+    }
+
+    #[test]
+    fn test_ip_rate_limiter_unban_and_pair_protection() {
+        let limiter = IpRateLimiter::new();
+        let target_ip = "192.0.2.100";
+
+        // 触发配对失败封禁（3 次失败 = 15 次违规）
+        limiter.record_pair_fail(target_ip);
+        assert!(limiter.check_pair_rate(target_ip).is_ok());
+        limiter.record_pair_fail(target_ip);
+        assert!(limiter.check_pair_rate(target_ip).is_err());
+        limiter.record_pair_fail(target_ip);
+
+        // 验证已进入封禁列表
+        let banned = limiter.list_banned();
+        assert!(banned.iter().any(|(ip, _)| ip == target_ip));
+        assert!(limiter.check_and_record(target_ip).is_err());
+
+        // 手动解封
+        assert!(limiter.unban(target_ip));
+        assert!(limiter.check_and_record(target_ip).is_ok());
+        assert!(limiter.list_banned().is_empty());
     }
 }

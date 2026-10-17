@@ -19,6 +19,7 @@
     <div class="segmented" id="tabs">
       <button data-view="dash" class="active">概览</button>
       <button data-view="posts">文章</button>
+      <button data-view="devices">设备</button>
       <button data-view="security">安全</button>
       <button data-view="logs">日志</button>
     </div>
@@ -46,8 +47,12 @@
           <span class="l">已发布文章</span>
         </div>
         <div class="kpi">
-          <span class="v green" id="k-up"><span class="skeleton">000</span></span>
-          <span class="l">已运行</span>
+          <span class="v green" id="k-likes"><span class="skeleton">00</span></span>
+          <span class="l">文章获赞</span>
+        </div>
+        <div class="kpi">
+          <span class="v" id="k-devs"><span class="skeleton">0</span></span>
+          <span class="l">可信设备</span>
         </div>
         <div class="kpi">
           <span class="v" id="k-rss"><span class="skeleton">000</span></span>
@@ -70,23 +75,38 @@
       </div>
 
       <div class="card">
-        <h2>运行状态</h2>
+        <h2>运行状态与资源监控</h2>
         <div class="kpis cols-2">
           <div class="kpi">
             <span class="v" id="k-cpu"><span class="skeleton">00</span></span>
-            <span class="l">CPU</span>
+            <span class="l">CPU 亲和占用</span>
           </div>
           <div class="kpi">
             <span class="v" id="k-db"><span class="skeleton">000</span></span>
-            <span class="l">数据库</span>
+            <span class="l">数据库大小</span>
           </div>
           <div class="kpi">
             <span class="v" id="k-gate"><span class="skeleton">000</span></span>
-            <span class="l">并发连接</span>
+            <span class="l">并发门控 (活跃/上限)</span>
           </div>
           <div class="kpi">
             <span class="v" id="k-sess"><span class="skeleton">00</span></span>
             <span class="l">活跃会话</span>
+          </div>
+          <div class="kpi" style="grid-column: 1 / -1; margin-top: 4px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+              <span class="l" style="margin:0">CGroup 内存熔断阻尼</span>
+              <span class="v" id="k-mem-status" style="font-size:13.5px;font-weight:600">正常 (满血模式)</span>
+            </div>
+            <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;position:relative">
+              <div id="mem-bar" style="background:var(--blue);height:100%;width:8%;transition:width .4s ease, background .4s ease"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--fg-3);margin-top:4px">
+              <span id="mem-cur">0 MB</span>
+              <span>256MB 满血</span>
+              <span>384MB 限流</span>
+              <span>512MB 熔断</span>
+            </div>
           </div>
         </div>
       </div>
@@ -143,6 +163,52 @@
     </div>
   </section>
 
+  <!-- ================================================== 可信设备 -->
+  <section class="view" id="view-devices" hidden>
+    <div class="grid cols-2">
+      <div class="card">
+        <h2>配对新可信设备</h2>
+        <div class="pad">
+          <p style="font-size:13px;color:var(--fg-2);margin:0 0 14px;line-height:1.6">
+            生成临时配对密钥（15 分钟内有效，单次绑定即销毁）。在手机或平板浏览器中打开该链接，即可完成设备信任验证并解锁博客导航栏的后台管理入口。
+          </p>
+          <div class="field">
+            <label for="dev-name-input">设备备注名称</label>
+            <input class="input" id="dev-name-input" placeholder="例如：Jerry 的 iPhone 14 / Pixel 7">
+          </div>
+          <button class="btn primary" id="btn-gen-pair">生成临时配对链接</button>
+
+          <div id="pair-result" style="display:none;margin-top:14px;padding:12px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+            <div style="font-size:12.5px;font-weight:600;color:var(--green);margin-bottom:6px">临时配对码已生成</div>
+            <div style="font-size:11.5px;color:var(--fg-2);word-break:break-all;margin-bottom:8px;font-family:monospace" id="pair-url-text"></div>
+            <button class="btn" id="btn-copy-pair-url">复制配对链接</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>已授权的可信设备 <span id="dev-count" style="color:var(--fg-3);font-weight:400"></span></h2>
+        <div class="table-scroll" style="margin-top:10px">
+          <table class="data" id="dev-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>设备标识</th>
+                <th>绑定时间</th>
+                <th>最近活跃</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dev-body">
+              <tr><td colspan="6"><div class="empty">加载中…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ================================================== 安全 -->
   <section class="view" id="view-security" hidden>
     <div class="card">
@@ -168,17 +234,36 @@
     </div>
 
     <div class="card">
+      <h2>实时拦截与封禁恶意 IP <span id="banned-count" style="color:var(--fg-3);font-weight:400"></span></h2>
+      <div class="table-scroll" style="margin-top:10px">
+        <table class="data" id="banned-table">
+          <thead>
+            <tr>
+              <th>IP 地址</th>
+              <th>剩余封禁时间</th>
+              <th>防御状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="banned-body">
+            <tr><td colspan="4"><div class="empty">当前无处于封禁状态的 IP</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>恶意流量峰值时段</h2>
       <div class="bars" id="bars-sec"></div>
     </div>
 
     <div class="card">
-      <h2>说明</h2>
+      <h2>说明与物理防护机制</h2>
       <div class="pad" style="color:var(--fg-2);font-size:13.5px;line-height:1.75">
-        <p style="margin:0 0 8px"><b style="color:var(--fg)">扫描</b>　访问不存在的路径（404），通常是自动化工具在探测漏洞。</p>
-        <p style="margin:0 0 8px"><b style="color:var(--fg)">爬虫</b>　User-Agent 含 bot / crawler / spider / scanner 的请求。</p>
-        <p style="margin:0 0 8px"><b style="color:var(--fg)">并发拦截</b>　超过并发门控上限、被返回 503 的连接。</p>
-        <p style="margin:0"><b style="color:var(--fg)">认证爆破</b>　管理接口认证失败（401）的记录。</p>
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">双端口物理隔离</b>　公网口仅接受 GET/HEAD 只读访问；管理口绑定 127.0.0.1 仅通过 SSH / 可信设备访问。</p>
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">可信设备公私钥防护</b>　非受信任设备的公网连接无法探测后台（返回 404 Not Found），彻底消除跳板与嗅探面。</p>
+        <p style="margin:0 0 8px"><b style="color:var(--fg)">扫描与爆破防护</b>　连续 15 次 404 或高频探测即触发 5 分钟封禁；配对接口 3 次错误即锁定。</p>
+        <p style="margin:0"><b style="color:var(--fg)">CGroup 阻尼熔断</b>　512MB 物理硬限，384MB 触发请求限流，256MB 满血恢复，保障服务常驻不被系统 OOM Kill。</p>
       </div>
     </div>
   </section>
