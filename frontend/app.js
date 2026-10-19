@@ -43,25 +43,23 @@ const FRIENDS = [
   }
 ];
 
-/* 壁纸按方向区分：横版壁纸（桌面/平板/横屏）与竖版壁纸（手机竖屏） */
+/* 壁纸按方向区分：横版壁纸与竖版壁纸全部开放供用户自由选用 */
 const WALLS = [
   { id: "clean", name: "纯色", img: "", orient: "any" },
+  { id: "banner", name: "草地", img: "/assets/banner.jpg", orient: "landscape" },
   { id: "skull", name: "花海", img: "/assets/skull.jpg", orient: "portrait" },
   { id: "arch", name: "樱", img: "/assets/arch.jpg", orient: "portrait" },
+  { id: "avatar3", name: "红伞", img: "/assets/avatar3.jpg", orient: "landscape" },
   { id: "bg5", name: "雾", img: "/assets/bg5.jpg", orient: "portrait" },
   { id: "bg6", name: "夜", img: "/assets/bg6.jpg", orient: "portrait" },
-  { id: "banner", name: "草地", img: "/assets/banner.jpg", orient: "landscape" },
-  { id: "avatar3", name: "红伞", img: "/assets/avatar3.jpg", orient: "landscape" },
   { id: "long2", name: "原野", img: "/assets/long2.jpg", orient: "landscape" }
 ];
 function isLandscape() { return window.innerWidth > window.innerHeight; }
-function activeWalls() {
-  return WALLS.filter(w => w.orient === "any" || (isLandscape() ? w.orient === "landscape" : w.orient === "portrait"));
-}
-const DEFAULT_WALL = () => "clean";
+function activeWalls() { return WALLS; }
+const DEFAULT_WALL = () => "banner";
 
 const wallSaved = localStorage.getItem("jb_wall3");
-let initWall = wallSaved || "clean";
+let initWall = wallSaved || "banner";
 localStorage.setItem("jb_wall3", initWall);
 
 const state = {
@@ -104,14 +102,26 @@ function applyFontScale() {
 function applyWall() {
   let w = WALLS.find(x => x.id === state.wall);
   if (!w) {
-    state.wall = "clean";
-    w = WALLS[0];
+    state.wall = "banner";
+    w = WALLS.find(x => x.id === "banner") || WALLS[0];
   }
   const el = document.getElementById("wallpaper");
+  const shade = document.getElementById("wall-shade");
   const isClean = !w || w.id === "clean" || !w.img;
   if (el) {
-    el.style.backgroundImage = isClean ? "none" : "url('" + w.img + "')";
-    el.style.display = isClean ? "none" : "block";
+    if (isClean) {
+      el.style.setProperty("background-image", "none", "important");
+      el.style.setProperty("display", "none", "important");
+      el.style.setProperty("opacity", "0", "important");
+    } else {
+      el.style.setProperty("background-image", "url('" + w.img + "')", "important");
+      el.style.setProperty("display", "block", "important");
+      el.style.setProperty("opacity", "1", "important");
+    }
+  }
+  if (shade) {
+    shade.style.setProperty("display", isClean ? "none" : "block", "important");
+    shade.style.setProperty("opacity", isClean ? "0" : "1", "important");
   }
   document.body.classList.toggle("wall-clean", isClean);
   document.body.classList.toggle("has-wall", !isClean);
@@ -1327,7 +1337,8 @@ function renderAbout() {
       state.wall = b.dataset.wall;
       applyWall();
       $$(".wall-thumb", wg).forEach(x => x.classList.toggle("on", x === b));
-      showToast("壁纸已切换");
+      const cur = WALLS.find(x => x.id === state.wall);
+      showToast("壁纸已切换为「" + (cur ? cur.name : "纯色") + "」");
     }));
   }
 }
