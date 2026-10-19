@@ -10,7 +10,28 @@ use std::io::Read;
 use std::path::PathBuf;
 
 fn db_path() -> PathBuf {
-    PathBuf::from(env::var("BLOG_DB").unwrap_or_else(|_| "blog.db".to_string()))
+    if let Ok(v) = env::var("BLOG_DB") {
+        return PathBuf::from(v);
+    }
+    let opt_path = PathBuf::from("/opt/blog/blog.db");
+    if opt_path.exists() {
+        return opt_path;
+    }
+    let cwd_path = PathBuf::from("blog.db");
+    if cwd_path.exists() {
+        return cwd_path;
+    }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let p_db = parent.join("blog.db");
+            if p_db.exists() { return p_db; }
+            if let Some(grandparent) = parent.parent() {
+                let gp_db = grandparent.join("blog.db");
+                if gp_db.exists() { return gp_db; }
+            }
+        }
+    }
+    PathBuf::from("blog.db")
 }
 
 fn usage() {
