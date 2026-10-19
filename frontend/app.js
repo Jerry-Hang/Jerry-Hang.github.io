@@ -58,16 +58,11 @@ function isLandscape() { return window.innerWidth > window.innerHeight; }
 function activeWalls() {
   return WALLS.filter(w => w.orient === "any" || (isLandscape() ? w.orient === "landscape" : w.orient === "portrait"));
 }
-const DEFAULT_WALL = () => isLandscape() ? "banner" : "skull";
+const DEFAULT_WALL = () => "clean";
 
-const wallSaved = localStorage.getItem("jb_wall2");
-const wallMigrated = localStorage.getItem("jb_wall_m2");
-let initWall = wallSaved;
-if (!wallSaved || !wallMigrated || wallSaved === "clean") {
-  initWall = DEFAULT_WALL();
-  localStorage.setItem("jb_wall2", initWall);
-  localStorage.setItem("jb_wall_m2", "1");
-}
+const wallSaved = localStorage.getItem("jb_wall3");
+let initWall = wallSaved || "clean";
+localStorage.setItem("jb_wall3", initWall);
 
 const state = {
   theme: localStorage.getItem("jb_theme") || "dark",
@@ -108,18 +103,19 @@ function applyFontScale() {
 
 function applyWall() {
   let w = WALLS.find(x => x.id === state.wall);
-  if (!w || (w.orient !== "any" && (isLandscape() ? w.orient !== "landscape" : w.orient !== "portrait"))) {
-    state.wall = DEFAULT_WALL();
-    w = WALLS.find(x => x.id === state.wall);
+  if (!w) {
+    state.wall = "clean";
+    w = WALLS[0];
   }
   const el = document.getElementById("wallpaper");
   const isClean = !w || w.id === "clean" || !w.img;
   if (el) {
     el.style.backgroundImage = isClean ? "none" : "url('" + w.img + "')";
+    el.style.display = isClean ? "none" : "block";
   }
   document.body.classList.toggle("wall-clean", isClean);
   document.body.classList.toggle("has-wall", !isClean);
-  localStorage.setItem("jb_wall2", state.wall);
+  localStorage.setItem("jb_wall3", state.wall);
 }
 
 /* ---------- 主题：跟随系统 + 手动切换 ---------- */
