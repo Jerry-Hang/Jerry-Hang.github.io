@@ -674,6 +674,11 @@ async fn external_handler(State(state): State<Arc<AppState>>, ConnectInfo(peer):
 
 fn is_trusted_device_session(state: &AppState, headers: &HeaderMap) -> bool {
     let cookies = parse_cookies(headers);
+    if let Some(tok) = cookies.get("blog_admin") {
+        if state.db.valid_session(tok, "admin") {
+            return true;
+        }
+    }
     if let Some(tok) = cookies.get("blog_trusted") {
         if state.db.valid_session(tok, "trusted") {
             if let Some(dev_id) = cookies.get("blog_dev_id") {
@@ -692,17 +697,25 @@ fn handle_auth_check(state: &AppState, headers: &HeaderMap) -> Response {
     let cookies = parse_cookies(headers);
     let mut trusted = false;
     let mut name = String::new();
-    if let Some(tok) = cookies.get("blog_trusted") {
-        if state.db.valid_session(tok, "trusted") {
-            if let Some(dev_id) = cookies.get("blog_dev_id") {
-                if state.db.is_trusted_device(dev_id) {
+    if let Some(tok) = cookies.get("blog_admin") {
+        if state.db.valid_session(tok, "admin") {
+            trusted = true;
+            name = "管理员".to_string();
+        }
+    }
+    if !trusted {
+        if let Some(tok) = cookies.get("blog_trusted") {
+            if state.db.valid_session(tok, "trusted") {
+                if let Some(dev_id) = cookies.get("blog_dev_id") {
+                    if state.db.is_trusted_device(dev_id) {
+                        trusted = true;
+                        name = "已验证受信任设备".to_string();
+                        state.db.touch_device(dev_id);
+                    }
+                } else {
                     trusted = true;
                     name = "已验证受信任设备".to_string();
-                    state.db.touch_device(dev_id);
                 }
-            } else {
-                trusted = true;
-                name = "已验证受信任设备".to_string();
             }
         }
     }
@@ -718,15 +731,30 @@ async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Resp
     }
     let body = read_json(req).await;
     let code = body.get("code").and_then(|v| v.as_str()).unwrap_or("").trim();
-    let dev_id = body.get("device_id").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let dev_id_raw = body.get("device_id").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let generated_dev_id = random_token();
+    let dev_id = if dev_id_raw.is_empty() { &generated_dev_id } else { dev_id_raw };
     let pubkey = body.get("pubkey").and_then(|v| v.as_str()).unwrap_or("").trim();
     let client_name = body.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
 
-    if code.is_empty() || dev_id.is_empty() {
-        return json_response(StatusCode::BAD_REQUEST, json!({"error": "缺少配对码或设备标识"}));
+    if code.is_empty() {
+        return json_response(StatusCode::BAD_REQUEST, json!({"error": "缺少配对凭证或密钥"}));
     }
 
-    match state.db.verify_and_consume_pair_code(code, dev_id, pubkey) {
+    let pwd_sha = state.cfg.read().unwrap().password_sha256.clone();
+    let is_admin_pwd = !code.is_empty() && (
+        code == pwd_sha ||
+        crate::sha256::sha256_hex(code.as_bytes()) == pwd_sha
+    );
+
+    let verify_res = if is_admin_pwd {
+        let dev_name = if !client_name.is_empty() { client_name.to_string() } else { "管理员受信任设备".to_string() };
+        state.db.add_or_update_trusted_device(dev_id, &dev_name, pubkey)
+    } else {
+        state.db.verify_and_consume_pair_code(code, dev_id, pubkey)
+    };
+
+    match verify_res {
         Ok(db_name) => {
             let final_name = if !client_name.is_empty() { client_name } else { &db_name };
             state.db.touch_device(dev_id);

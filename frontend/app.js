@@ -1190,12 +1190,42 @@ function runSearch(query) {
 
   if (countBox) countBox.textContent = "找到 " + searchMatches.length + " 篇相关文章";
 
+  const isAuthQuery = /^(admin|auth|login|后台|管理|验证|设备)/i.test(query.trim());
+
   if (!searchMatches.length) {
+    if (isAuthQuery) {
+      resultsBox.innerHTML = '<div class="sm-item" id="sm-auth-action" style="cursor:pointer;border-left:3px solid var(--accent);background:rgba(230,0,0,0.06);padding:14px;">' +
+        '<div class="sm-item-head"><span class="sm-item-title" style="color:var(--accent);font-weight:700;">受信任设备授权 (解锁管理入口)</span></div>' +
+        '<div class="sm-item-snippet" style="color:var(--text);margin-top:4px;">输入管理员密码或配对凭证，永久为当前设备开启导航栏后台管理入口。</div>' +
+        '</div>';
+      const actionEl = document.getElementById("sm-auth-action");
+      if (actionEl) {
+        actionEl.addEventListener("click", () => {
+          closeSearchModal();
+          openDeviceAuthModal();
+        });
+      }
+      return;
+    }
     resultsBox.innerHTML = '<div class="sm-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="28" height="28" style="opacity:.3;margin-bottom:8px;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><div>未找到关于 “<b>' + esc(query) + '</b>” 的相关文章</div></div>';
     return;
   }
 
-  resultsBox.innerHTML = searchMatches.map((p, idx) => renderSearchItem(p, idx, query)).join("");
+  let html = searchMatches.map((p, idx) => renderSearchItem(p, idx, query)).join("");
+  if (isAuthQuery) {
+    html = '<div class="sm-item" id="sm-auth-action" style="cursor:pointer;border-left:3px solid var(--accent);background:rgba(230,0,0,0.06);padding:14px;margin-bottom:8px;">' +
+      '<div class="sm-item-head"><span class="sm-item-title" style="color:var(--accent);font-weight:700;">受信任设备授权 (解锁管理入口)</span></div>' +
+      '<div class="sm-item-snippet" style="color:var(--text);margin-top:4px;">输入管理员密码或配对凭证，永久为当前设备开启导航栏后台管理入口。</div>' +
+      '</div>' + html;
+  }
+  resultsBox.innerHTML = html;
+  const actionEl = document.getElementById("sm-auth-action");
+  if (actionEl) {
+    actionEl.addEventListener("click", () => {
+      closeSearchModal();
+      openDeviceAuthModal();
+    });
+  }
   bindSearchItemClicks();
   updateSearchActive();
 }
@@ -1306,30 +1336,8 @@ function renderAbout() {
   }
 }
 
-/* ---------- 3D tilt（仅精细指针设备） ---------- */
-(function() {
-  const fine = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
-  function attach(root) {
-    if (!fine) return;
-    (root || document).querySelectorAll(".pill:not([data-tilt]), .pin-card:not([data-tilt]), .home-item:not([data-tilt])").forEach(el => {
-      el.setAttribute("data-tilt", "1");
-      el.addEventListener("mousemove", e => {
-        const r = el.getBoundingClientRect();
-        if (!r.width || !r.height) return;
-        const px = (e.clientX - r.left) / r.width - 0.5;
-        const py = (e.clientY - r.top) / r.height - 0.5;
-        el.style.transform = "perspective(700px) rotateX(" + (-py * 7).toFixed(2) + "deg) rotateY(" + (px * 9).toFixed(2) + "deg) translateY(-2px)";
-        try {
-          el.style.setProperty("--mx", (px * 100 + 50).toFixed(1) + "%");
-          el.style.setProperty("--my", (py * 100 + 50).toFixed(1) + "%");
-        } catch (err) { /* 自定义属性在个别环境受限 */ }
-      });
-      el.addEventListener("mouseleave", () => { el.style.transform = ""; });
-    });
-  }
-  window.bindTilt = attach;
-  attach();
-})();
+/* 瑞士国际平面风格：平整稳定排版，废除 3D 摇晃与拟物物理 */
+window.bindTilt = function() {};
 
 /* ---------- 总渲染 ---------- */
 function renderAll() {
@@ -1408,6 +1416,20 @@ document.addEventListener("keydown", e => {
   if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
     e.preventDefault();
     if (isSearchOpen) closeSearchModal(); else openSearchModal();
+    return;
+  }
+
+  if ((e.key === "a" || e.key === "A") && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+    e.preventDefault();
+    openDeviceAuthModal();
+    return;
+  }
+
+  const authModal = document.getElementById("auth-modal");
+  const isAuthOpen = authModal && !authModal.hasAttribute("hidden") && authModal.classList.contains("open");
+  if (isAuthOpen && e.key === "Escape") {
+    e.preventDefault();
+    closeDeviceAuthModal();
     return;
   }
 
@@ -1525,15 +1547,7 @@ function openFromHashIfAny() {
   if (btn) btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 })();
 
-/* 滚动收缩：顶部横条 → 悬浮胶囊（平滑过渡） */
-(function() {
-  const topArea = document.querySelector(".top-area");
-  let compact = false;
-  window.addEventListener("scroll", () => {
-    const should = window.scrollY > 70;
-    if (should !== compact) { compact = should; topArea.classList.toggle("compact", compact); }
-  }, { passive: true });
-})();
+/* 瑞士顶栏保持稳固架构与全宽对齐，不使用滚动变悬浮胶囊动效 */
 
 /* ---------- 互动点赞与二维码分享 ---------- */
 
@@ -1819,7 +1833,7 @@ function generateQrSvg(str, size) {
 /* ---------- 可信设备远程后台检测与配对 ---------- */
 async function initTrustedDeviceAuth() {
   const params = new URLSearchParams(window.location.search);
-  const pairCode = params.get("pair");
+  const pairCode = params.get("pair") || params.get("auth");
   if (pairCode) {
     let devId = localStorage.getItem("jb_dev_id");
     if (!devId) {
@@ -1834,20 +1848,21 @@ async function initTrustedDeviceAuth() {
         body: JSON.stringify({
           code: pairCode.trim(),
           device_id: devId,
-          name: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "移动端设备" : "受信任电脑设备"
+          name: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "移动端受信任设备" : "桌面受信任设备"
         })
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        showToast("设备授权成功！已解锁后台管理入口");
+        showToast("设备授权成功！已永久解锁后台管理入口");
         injectAdminNavButton();
         params.delete("pair");
+        params.delete("auth");
         const newSearch = params.toString();
         const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
         history.replaceState(null, "", newUrl);
         return;
       } else {
-        showToast(data.error || "配对失败或配对码已失效");
+        showToast(data.error || "配对失败或凭证已失效");
       }
     } catch (e) {
       showToast("连接配对服务失败");
@@ -1863,6 +1878,114 @@ async function initTrustedDeviceAuth() {
       }
     }
   } catch (e) { /* 未授权或离线保持静默 */ }
+}
+
+function openDeviceAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  const input = document.getElementById("auth-input-key");
+  const msg = document.getElementById("auth-status-msg");
+  if (!modal) return;
+  modal.removeAttribute("hidden");
+  modal.classList.add("open");
+  if (msg) { msg.hidden = true; msg.className = "am-msg"; msg.textContent = ""; }
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 80);
+  }
+}
+
+function closeDeviceAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  setTimeout(() => modal.setAttribute("hidden", ""), 180);
+}
+
+function initDeviceAuthModal() {
+  const modal = document.getElementById("auth-modal");
+  const backdrop = document.getElementById("auth-backdrop");
+  const closeBtn = document.getElementById("auth-modal-close");
+  const submitBtn = document.getElementById("auth-submit-btn");
+  const input = document.getElementById("auth-input-key");
+  const msg = document.getElementById("auth-status-msg");
+  const footerBtn = document.getElementById("btn-device-auth");
+
+  if (footerBtn) {
+    footerBtn.addEventListener("click", e => {
+      e.preventDefault();
+      openDeviceAuthModal();
+    });
+  }
+  if (backdrop) backdrop.addEventListener("click", closeDeviceAuthModal);
+  if (closeBtn) closeBtn.addEventListener("click", closeDeviceAuthModal);
+
+  async function doAuth() {
+    const key = input ? input.value.trim() : "";
+    if (!key) {
+      if (msg) {
+        msg.hidden = false;
+        msg.className = "am-msg err";
+        msg.textContent = "请输入管理员密码或配对凭证";
+      }
+      return;
+    }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "正在验证..."; }
+    let devId = localStorage.getItem("jb_dev_id");
+    if (!devId) {
+      devId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem("jb_dev_id", devId);
+    }
+    try {
+      const res = await fetch("/api/auth/pair-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: key,
+          device_id: devId,
+          name: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? "移动端受信任设备" : "桌面受信任设备"
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        if (msg) {
+          msg.hidden = false;
+          msg.className = "am-msg ok";
+          msg.innerHTML = "验证成功！此设备已永久授权。<br><a href='/admin' style='color:var(--accent);font-weight:700;display:inline-block;margin-top:6px;text-decoration:underline;'>点击立即前往管理后台 &rarr;</a>";
+        }
+        injectAdminNavButton();
+        showToast("设备授权成功！已永久解锁管理入口");
+        if (input) input.value = "";
+      } else {
+        if (msg) {
+          msg.hidden = false;
+          msg.className = "am-msg err";
+          msg.textContent = data.error || "验证失败，凭证不正确或已失效";
+        }
+      }
+    } catch (e) {
+      if (msg) {
+        msg.hidden = false;
+        msg.className = "am-msg err";
+        msg.textContent = "请求失败，请检查网络或后端连接";
+      }
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "验证并绑定本设备"; }
+    }
+  }
+
+  if (submitBtn) submitBtn.addEventListener("click", doAuth);
+  if (input) {
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doAuth();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeDeviceAuthModal();
+      }
+    });
+  }
 }
 
 function injectAdminNavButton() {
@@ -1886,7 +2009,7 @@ function injectAdminNavButton() {
     const sideDiv = document.createElement("div");
     sideDiv.id = "side-btn-admin";
     sideDiv.style.padding = "10px 14px 4px";
-    sideDiv.innerHTML = '<button class="act-btn" style="width:100%;justify-content:center;background:rgba(255,255,255,.08);font-size:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>进入管理后台</button>';
+    sideDiv.innerHTML = '<button class="act-btn" style="width:100%;justify-content:center;background:var(--accent);border-color:var(--accent);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>管理后台</button>';
     sideDiv.querySelector("button").addEventListener("click", () => {
       window.location.href = "/admin";
     });
@@ -1912,4 +2035,6 @@ function injectAdminNavButton() {
   showView("home");
   loadPosts();
   initTrustedDeviceAuth();
+  initDeviceAuthModal();
 })();
+

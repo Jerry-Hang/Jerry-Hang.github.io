@@ -12,31 +12,32 @@
 <link rel="alternate" type="application/rss+xml" title="JerryHang 的个人博客" href="/feed.xml">
 <link rel="icon" href="/assets/avatar.jpg">
 <style>
-/* ========== iOS 系统色板 ========== */
+/* ========== 瑞士国际平面风格（International Typographic Style） ========== */
 :root {
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  --accent: #007aff;
-  --accent-soft: rgba(0,122,255,.12);
+  --font: "Helvetica Neue", Helvetica, "Neue Haas Grotesk", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --accent: #e60000; /* 纯粹瑞士红 (Swiss Vermilion Red) */
+  --accent-soft: rgba(230, 0, 0, 0.08);
 
-  --bg: #f2f2f7;
-  --card: rgba(255,255,255,.8);
-  --card-border: rgba(60,60,67,.12);
-  --text: #111114;
-  --text-soft: rgba(60,60,67,.62);
-  --text-faint: rgba(60,60,67,.38);
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-border: #e4e4e7;
+  --border: #e4e4e7;
+  --border-strong: #18181b;
+  --text: #09090b;
+  --text-soft: #52525b;
+  --text-faint: #a1a1aa;
 
-  --bar-bg: rgba(249,249,251,.72);
-  --pill-bg: rgba(255,255,255,.72);
-  --pill-hover: rgba(0,122,255,.08);
+  --bar-bg: #ffffff;
+  --pill-bg: #f4f4f5;
+  --pill-hover: #e4e4e7;
 
-  --shadow-s: 0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.05);
-  --shadow-m: 0 2px 6px rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.09);
-  --shadow-l: 0 18px 50px rgba(0,0,0,.18);
+  --shadow-s: 0 1px 3px rgba(0,0,0,.04);
+  --shadow-m: 0 4px 12px rgba(0,0,0,.06);
+  --shadow-l: 0 12px 30px rgba(0,0,0,.10);
 
-  /* ================= 设计尺度（8px 栅格） =================
-     原来各处的圆角和间距都是散着写的（10/12/14/16/18/22/24 混用），
-     这里统一成一套尺度，新写样式直接用变量，不要再写魔法数字。 */
+  /* 8px 网格尺度 */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -45,54 +46,56 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
-  --radius-s: 8px;
-  --radius-m: 12px;
-  --radius-l: 16px;
-  --radius-xl: 22px;
-  --radius-pill: 999px;
+  /* 瑞士风格：几何直角与极简微倒角 (0px ~ 2px)，彻底废除大圆角与浮夸胶囊 */
+  --radius-s: 0px;
+  --radius-m: 0px;
+  --radius-l: 2px;
+  --radius-xl: 2px;
+  --radius-pill: 2px;
 
-  /* 阅读区域宽度：中文正文一行 30-40 字最舒服，920px 太宽了 */
   --reading-width: 46rem;
 
-  --ease: cubic-bezier(.32,.72,0,1);
-  --dur-fast: .16s;
-  --dur: .24s;
-  --dur-slow: .38s;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --dur-fast: .12s;
+  --dur: .20s;
+  --dur-slow: .32s;
 
-  /* 代码高亮配色（浅色） */
-  --code-bg: rgba(120,120,128,.08);
-  --code-comment: #8a8f98;
-  --code-keyword: #a626a4;
-  --code-string: #50a14f;
-  --code-number: #b76b01;
-  --code-func: #4078f2;
+  /* 瑞士排版高亮（单色+强调） */
+  --code-bg: #f4f4f5;
+  --code-comment: #71717a;
+  --code-keyword: #e60000;
+  --code-string: #09090b;
+  --code-number: #52525b;
+  --code-func: #18181b;
 }
 body.dark {
-  --accent: #0a84ff;
-  --accent-soft: rgba(10,132,255,.16);
+  --accent: #ff3b30; /* 瑞士深色醒目红 */
+  --accent-soft: rgba(255, 59, 48, 0.14);
 
-  --bg: #000000;
-  --card: rgba(28,28,30,.78);
-  --card-border: rgba(255,255,255,.10);
-  --text: #f5f5f7;
-  --text-soft: rgba(235,235,245,.60);
-  --text-faint: rgba(235,235,245,.36);
+  --bg: #09090b;
+  --surface: #121215;
+  --card: #141417;
+  --card-border: #27272a;
+  --border: #27272a;
+  --border-strong: #fafafa;
+  --text: #fafafa;
+  --text-soft: #a1a1aa;
+  --text-faint: #71717a;
 
-  --bar-bg: rgba(28,28,30,.72);
-  --pill-bg: rgba(44,44,46,.78);
-  --pill-hover: rgba(10,132,255,.16);
+  --bar-bg: #0c0c0e;
+  --pill-bg: #18181b;
+  --pill-hover: #27272a;
 
-  --shadow-s: 0 1px 2px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.4);
-  --shadow-m: 0 2px 6px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.5);
-  --shadow-l: 0 18px 50px rgba(0,0,0,.7);
+  --shadow-s: 0 1px 3px rgba(0,0,0,.4);
+  --shadow-m: 0 4px 16px rgba(0,0,0,.6);
+  --shadow-l: 0 12px 40px rgba(0,0,0,.8);
 
-  /* 代码高亮配色（深色，参考 One Dark） */
-  --code-bg: rgba(255,255,255,.06);
-  --code-comment: #7f848e;
-  --code-keyword: #c678dd;
-  --code-string: #98c379;
-  --code-number: #d19a66;
-  --code-func: #61afef;
+  --code-bg: #18181b;
+  --code-comment: #71717a;
+  --code-keyword: #ff453a;
+  --code-string: #fafafa;
+  --code-number: #a1a1aa;
+  --code-func: #e4e4e7;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
@@ -981,40 +984,39 @@ body.wall-clean {
 <footer class="site-footer">
   <span>© 2026 Jerry · 记录与折腾</span>
   <span class="sf-links">
+    <button id="btn-device-auth" class="sf-auth-btn" title="输入凭证授权本设备以显示后台">设备验证</button>
     <a href="feed.xml" target="_blank" rel="noopener">RSS</a>
     <a href="https://github.com/Jerry-Hang/Jerry-Hang.github.io" target="_blank" rel="noopener">GitHub</a>
   </span>
 </footer>
 <div id="scrim"></div>
 <button id="back-top" aria-label="回到顶部">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
 </button>
 <div id="toast"></div>
 <script>window.__ARTICLE__ = "android-agent";</script>
 <script src="/app.js?v=20261013_v3"></script>
 <style id="aurora-frost">
-:root{--font:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,"SF Pro Text","SF Pro Display","PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Microsoft YaHei",sans-serif;--a-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-/* DEFAULT = strict dark aurora (body.dark or no manual light) */
-body{position:relative;background:#05070f !important;background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.30),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.26),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.20),transparent 55%),linear-gradient(180deg,#070b18,#0d1226) !important;background-attachment:fixed !important;color:var(--text) !important;font-family:var(--font) !important;}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.05;background-image:var(--a-noise);}
-.pill{backdrop-filter:blur(20px) saturate(160%) !important;-webkit-backdrop-filter:blur(20px) saturate(160%) !important;background:rgba(255,255,255,.07) !important;border:1px solid rgba(255,255,255,.14) !important;border-radius:24px !important;box-shadow:0 8px 32px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.12) !important;position:relative !important;overflow:hidden !important;transition:transform .24s var(--ease),box-shadow .24s var(--ease),background .24s var(--ease),border-color .24s var(--ease) !important;}
-.pill::before{content:none !important;}
-.pill::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.08),transparent 70%);}
-.pill:hover{transform:translateY(-2px) !important;box-shadow:0 14px 44px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.18) !important;background:rgba(255,255,255,.10) !important;border-color:rgba(255,255,255,.24) !important;}
-.pill.selected{background:rgba(255,255,255,.14) !important;border-color:var(--accent) !important;}
-.pill-wrap{padding:4px !important;}
-.reader-head,.reader-foot,.r-fontbar,#r-body{backdrop-filter:blur(20px) saturate(160%) !important;-webkit-backdrop-filter:blur(20px) saturate(160%) !important;background:rgba(255,255,255,.07) !important;border:1px solid rgba(255,255,255,.14) !important;border-radius:24px !important;box-shadow:0 8px 32px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.12) !important;}
-.md-body{padding:16px !important;}
-.home-list .home-card,.about-card,.about-main{backdrop-filter:blur(20px) !important;-webkit-backdrop-filter:blur(20px) !important;background:rgba(255,255,255,.07) !important;border:1px solid rgba(255,255,255,.14) !important;border-radius:24px !important;box-shadow:0 8px 32px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.12) !important;}
-.menubar,.taskbar,.top-bar,#taskbar,#menubar{backdrop-filter:blur(16px) saturate(170%) !important;-webkit-backdrop-filter:blur(16px) saturate(170%) !important;background:rgba(8,12,24,.50) !important;border-bottom:1px solid rgba(255,255,255,.10) !important;transition:background .3s ease,backdrop-filter .3s ease !important;}
-.menubar.scrolled,.taskbar.scrolled,.top-bar.scrolled,#taskbar.scrolled,#menubar.scrolled{background:rgba(6,9,18,.75) !important;}
-/* MANUAL LIGHT (body:not(.dark) — set by #tb-theme / jb_theme, independent of prefers-color-scheme) */
-body:not(.dark){background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.38),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.30),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.20),transparent 55%),linear-gradient(180deg,#d4e0f4,#c8d2f0) !important;}
-body:not(.dark) .pill{background:rgba(255,255,255,.72) !important;border-color:rgba(0,0,0,.08) !important;box-shadow:0 6px 24px rgba(30,41,59,.10), inset 0 1px 0 rgba(255,255,255,.85) !important;}
-body:not(.dark) .pill:hover{background:rgba(255,255,255,.88) !important;transform:translateY(-2px) !important;box-shadow:0 10px 32px rgba(30,41,59,.14) !important;border-color:rgba(0,0,0,.14) !important;}
-body:not(.dark) .reader-head,body:not(.dark) .reader-foot,body:not(.dark) .r-fontbar,body:not(.dark) #r-body,body:not(.dark) .home-list .home-card,body:not(.dark) .about-card,body:not(.dark) .about-main{background:rgba(255,255,255,.72) !important;border-color:rgba(0,0,0,.08) !important;box-shadow:0 6px 24px rgba(30,41,59,.10), inset 0 1px 0 rgba(255,255,255,.85) !important;}
-body:not(.dark) .menubar,body:not(.dark) .taskbar,body:not(.dark) .top-bar,body:not(.dark) #taskbar,body:not(.dark) #menubar{background:rgba(255,255,255,.68) !important;border-bottom-color:rgba(0,0,0,.08) !important;}
-body:not(.dark) .menubar.scrolled,body:not(.dark) .taskbar.scrolled,body:not(.dark) .top-bar.scrolled,body:not(.dark) #taskbar.scrolled,body:not(.dark) #menubar.scrolled{background:rgba(255,255,255,.88) !important;}
+:root{--font:"Helvetica Neue",Helvetica,"Neue Haas Grotesk",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
+/* 瑞士国际平面风格：纯色平整背景，彻底废除多色极光与毛玻璃模糊 */
+body{position:relative;background:#f5f5f7 !important;background-image:none !important;color:var(--text) !important;font-family:var(--font) !important;}
+body::before{display:none !important;}
+.pill{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--card) !important;border:1px solid var(--border) !important;border-radius:0px !important;box-shadow:var(--shadow-s) !important;position:relative !important;overflow:hidden !important;transition:border-color .15s ease,background .15s ease !important;}
+.pill::before,.pill::after{display:none !important;}
+.pill:hover{transform:none !important;border-color:var(--border-strong) !important;box-shadow:var(--shadow-m) !important;}
+.pill.selected{background:var(--accent-soft) !important;border-color:var(--accent) !important;}
+.pill-wrap{padding:2px !important;}
+.reader-head,.reader-foot,.r-fontbar,#r-body{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--card) !important;border:1px solid var(--border) !important;border-radius:0px !important;box-shadow:var(--shadow-s) !important;}
+.md-body{padding:20px !important;}
+.home-list .home-card,.about-card,.about-main{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--card) !important;border:1px solid var(--border) !important;border-radius:0px !important;box-shadow:var(--shadow-s) !important;}
+.menubar,.taskbar,.top-bar,#taskbar,#menubar,.top-area{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--bar-bg) !important;border-bottom:1px solid var(--border) !important;box-shadow:0 1px 2px rgba(0,0,0,.04) !important;}
+
+/* 深色模式纯净瑞士架构黑底 */
+body.dark{background:#09090b !important;background-image:none !important;}
+body.dark .pill{background:var(--card) !important;border-color:var(--border) !important;box-shadow:var(--shadow-s) !important;}
+body.dark .pill:hover{border-color:var(--border-strong) !important;}
+body.dark .reader-head,body.dark .reader-foot,body.dark .r-fontbar,body.dark #r-body,body.dark .home-list .home-card,body.dark .about-card,body.dark .about-main{background:var(--card) !important;border-color:var(--border) !important;box-shadow:var(--shadow-s) !important;}
+body.dark .menubar,body.dark .taskbar,body.dark .top-bar,body.dark #taskbar,body.dark #menubar,body.dark .top-area{background:var(--bar-bg) !important;border-bottom-color:var(--border) !important;}
 </style>
 <style id="reading-enhance">
 /* ==========================================================================
@@ -3916,11 +3918,353 @@ body:not(.dark) .fac-copy-btn {
   opacity: 1 !important;
 }
 
-/* ---------- 极窄屏 (<440px) 优化保证搜索与友链顺畅 ---------- */
-@media (max-width: 440px) {
-  .search-modal { padding: 48px 10px 10px; }
-  .sm-shortcuts { display: none; }
-  .friends-grid { grid-template-columns: 1fr; }
+/* ==========================================================================
+   全瑞士国际主义平面风格重构 (Full Swiss Style Overhaul)
+   彻底废除 iOS 毛玻璃、半透明渐变、圆角胶囊与拟物反光
+   遵循严谨网格、无衬线几何字体、黑白灰高对比度架构与纯正瑞士红
+   ========================================================================== */
+
+/* 1. 彻底清空全局所有毛玻璃滤镜 */
+*, *::before, *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 2. 彻底废除 iOS 大圆角与胶囊形态，统一为 0px 直角或 2px 极简微倒角 */
+.top-area, .top-area.compact, #topbar,
+.icon-btn, .tb-menu, #tb-search, #tb-theme,
+.home-item, .hero-card, .pin-card, .about-card, .about-side, .about-main,
+.friend-card, .friend-apply-card, .fac-copy-btn,
+.stat, .side-cap, .wall-thumb,
+.pill, .pill-wrap, .pill .p-date, .pill .p-tag,
+.cat-tag, .tag, .p-tag, .hi-cats, .hi-date,
+.act-btn, .r-like-btn, .r-share-btn, .sm-act-btn, .pn-btn,
+.search-modal .sm-dialog, .swiss-modal-box,
+#back-top, #toast, .qr-svg-wrap,
+#side-search, .side-modes .mode, .outline-item {
+  border-radius: 0px !important;
+}
+
+/* 3. 彻底禁用伪物物理动画、3D倾斜与反光 */
+.pill::after, .pin-card::after, .home-item::after, .friend-card::after {
+  display: none !important;
+}
+.pill, .pin-card, .home-item, .hero-card, .about-card, .friend-card {
+  transform: none !important;
+  will-change: auto !important;
+}
+.home-item:hover, .pin-card:hover, .friend-card:hover {
+  transform: none !important;
+}
+
+/* 4. 瑞士网格式顶栏（严谨、稳固、不缩胶囊） */
+.top-area {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  height: 48px !important;
+  background: var(--bar-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+  z-index: 100 !important;
+}
+.top-area.compact {
+  width: 100% !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+#topbar {
+  height: 48px !important;
+  max-width: 1160px !important;
+  margin: 0 auto !important;
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+#tb-brand b {
+  font-family: var(--font) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: uppercase !important;
+}
+#tb-brand .brand-avatar {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+}
+#tb-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  max-height: 48px !important;
+  opacity: 1 !important;
+}
+#tb-tabs button {
+  font-family: var(--font) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: var(--text-soft) !important;
+  padding: 4px 2px !important;
+  border-radius: 0 !important;
+}
+#tb-tabs button:hover {
+  color: var(--text) !important;
+}
+#tb-tabs button.on {
+  color: var(--text) !important;
+  font-weight: 700 !important;
+}
+#tb-tabs button.on::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important; right: 0 !important; bottom: -2px !important;
+  width: 100% !important; height: 2px !important;
+  background: var(--accent) !important;
+}
+
+/* 顶栏后台管理按钮（瑞士醒目红标） */
+#tb-btn-admin, .tb-admin-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  border-radius: 0px !important;
+  margin-left: 6px !important;
+  cursor: pointer !important;
+  transition: background .15s ease, border-color .15s ease !important;
+}
+#tb-btn-admin:hover, .tb-admin-btn:hover {
+  background: #000000 !important;
+  border-color: #000000 !important;
+  color: #ffffff !important;
+}
+body.dark #tb-btn-admin:hover, body.dark .tb-admin-btn:hover {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* 5. 纯净实色卡片与高对比度排版 */
+.home-item, .hero-card, .pin-card, .about-card, .about-side, .about-main, .friend-card, .friend-apply-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0px !important;
+  box-shadow: var(--shadow-s) !important;
+}
+.home-item:hover, .pin-card:hover, .friend-card:hover {
+  border-color: var(--border-strong) !important;
+  box-shadow: var(--shadow-m) !important;
+}
+.home-item .hi-cover {
+  border-radius: 0px !important;
+}
+.home-item .hi-title {
+  font-family: var(--font) !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+}
+.home-item .hi-date {
+  font-family: var(--font) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  background: var(--pill-bg) !important;
+  color: var(--text-soft) !important;
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* 6. 文章阅读区与互动组件 */
+#view-reader {
+  max-width: var(--reading-width) !important;
+  margin: 0 auto !important;
+}
+.reader-head h1 {
+  font-family: var(--font) !important;
+  font-size: clamp(24px, 4vw, 36px) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.2 !important;
+}
+.reader-head .r-meta {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--text-faint) !important;
+}
+.r-foot-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding: 24px 0 10px !important;
+  border-top: 1px solid var(--border) !important;
+  margin-top: 30px !important;
+}
+.act-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 9px 18px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0px !important;
+  background: var(--surface) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  color: var(--text) !important;
+  cursor: pointer !important;
+  transition: all .15s ease !important;
+}
+.act-btn:hover {
+  background: var(--pill-hover) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text) !important;
+}
+.r-like-btn.liked {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #ffffff !important;
+}
+.r-like-btn.liked .like-heart {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+.pn-btn {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+}
+.pn-btn:hover:not(.disabled) {
+  border-color: var(--border-strong) !important;
+}
+
+/* 7. 瑞士风格二维码与设备验证弹窗 */
+.swiss-modal-mask {
+  background: rgba(0, 0, 0, 0.75) !important;
+}
+.swiss-modal-box {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0px !important;
+  box-shadow: var(--shadow-l) !important;
+  max-width: 360px !important;
+  padding: 24px !important;
+}
+.sm-head {
+  border-bottom: 1px solid var(--border) !important;
+  padding-bottom: 10px !important;
+  margin-bottom: 16px !important;
+}
+.sm-title {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: var(--text) !important;
+}
+.qr-svg-wrap {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  padding: 10px !important;
+  background: #ffffff !important;
+}
+
+/* 8. 受信任设备授权弹窗 (Auth Modal) */
+.auth-modal {
+  position: fixed; inset: 0; z-index: 10001;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity .18s ease, visibility .18s ease;
+  background: rgba(0, 0, 0, 0.75);
+}
+.auth-modal.open {
+  visibility: visible; opacity: 1; pointer-events: auto;
+}
+.auth-box {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0px;
+  padding: 26px;
+  box-shadow: var(--shadow-l);
+}
+.auth-box .am-tag {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px; display: block;
+}
+.auth-box .am-title {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.015em; color: var(--text);
+  margin-bottom: 12px;
+}
+.auth-box .am-desc {
+  font-size: 12.5px; color: var(--text-soft); line-height: 1.6; margin-bottom: 16px;
+}
+.auth-box .am-input {
+  width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 0px;
+  padding: 0 12px; font-size: 14px; font-family: inherit;
+  background: var(--bg); color: var(--text); outline: none; margin-bottom: 14px;
+}
+.auth-box .am-input:focus {
+  border-color: var(--border-strong);
+}
+.auth-box .am-submit {
+  width: 100%; height: 42px; background: var(--accent); color: #ffffff;
+  border: 1px solid var(--accent); border-radius: 0px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer; transition: background .15s ease;
+}
+.auth-box .am-submit:hover {
+  background: #000000; border-color: #000000;
+}
+body.dark .auth-box .am-submit:hover {
+  background: #ffffff; border-color: #ffffff; color: #000000;
+}
+.auth-box .am-msg {
+  margin-top: 12px; font-size: 12px; padding: 8px 10px; border: 1px solid var(--border);
+}
+.auth-box .am-msg.ok { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.06); }
+.auth-box .am-msg.err { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.06); }
+
+/* 9. 页脚验证入口与全局极简元素 */
+.sf-auth-btn {
+  background: none; border: none; font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.03em; color: var(--text-faint); cursor: pointer;
+  padding: 0; font-family: inherit; transition: color .15s ease;
+}
+.sf-auth-btn:hover { color: var(--accent); }
+#back-top {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-s) !important;
+}
+#toast {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-m) !important;
+  font-family: var(--font) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
 }
 </style>
 <script>
@@ -3967,6 +4311,24 @@ window.addEventListener('scroll',function(){document.querySelectorAll('.menubar,
       <p class="sm-desc">使用手机微信、相机或浏览器扫描打开</p>
       <button class="act-btn sm-act-btn" id="qr-copy-btn">复制文章链接</button>
     </div>
+  </div>
+</div>
+
+<!-- 受信任设备授权浮层 -->
+<div id="auth-modal" class="auth-modal" role="dialog" aria-modal="true" aria-label="受信任设备授权" hidden>
+  <div class="sm-backdrop" id="auth-backdrop"></div>
+  <div class="auth-box">
+    <div class="sm-head" style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <span class="am-tag">AUTHENTICATION</span>
+        <div class="am-title">受信任设备验证</div>
+      </div>
+      <button class="sm-close" id="auth-modal-close" aria-label="关闭">&times;</button>
+    </div>
+    <p class="am-desc">输入管理员密码或 SSH 单次配对码以授权此设备并显示后台管理入口：</p>
+    <input id="auth-input-key" class="am-input" type="password" placeholder="输入管理员密码或配对码" autocomplete="current-password">
+    <button id="auth-submit-btn" class="am-submit">验证并绑定本设备</button>
+    <div id="auth-status-msg" class="am-msg" hidden></div>
   </div>
 </div>
 
