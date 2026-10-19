@@ -477,6 +477,7 @@ function showView(name) {
     document.body.classList.toggle("home-bg", true);
     state.nav = name;
     if (name !== "reader") { state.sideView = "posts"; renderSide(); }
+    if (name === "about") { renderAbout(); }
     if (window.innerWidth <= 720) toggleSidebar(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -2031,6 +2032,7 @@ function injectAdminNavButton() {
 (function init() {
   applyTheme();
   applyWall();
+  renderAbout();
   // 侧栏初始状态：
   //   窄屏 —— 收起（汉堡抽屉，点按钮展开）
   //   宽屏 —— 默认展开，除非用户之前手动收起过
