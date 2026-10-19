@@ -741,20 +741,46 @@ body.dark .wall-thumb.clean { background: linear-gradient(135deg, #1c1c1e, #333)
    现在恢复壁纸可用：选了带图的壁纸时给 body 加 .has-wall，
    让极光那层 !important 的渐变全透明，壁纸才露得出来。
    选「纯色」时没有 .has-wall，仍然显示极光。 */
-#wallpaper, #wall-shade {
-  display: none !important;
-  opacity: 0 !important;
-  background-image: none !important;
-}
-body.has-wall #wallpaper {
-  display: block !important;
-  opacity: 1 !important;
+#wallpaper {
   position: fixed !important;
   inset: 0 !important;
   z-index: 0 !important;
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease, background-image 0.3s ease !important;
+}
+
+#wall-shade {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease !important;
+}
+
+body.wall-clean #wallpaper,
+body:not(.has-wall) #wallpaper,
+body.wall-clean #wall-shade,
+body:not(.has-wall) #wall-shade {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+body.has-wall #wallpaper {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+body.has-wall #wall-shade {
+  display: block !important;
+  opacity: 1 !important;
+  background: linear-gradient(180deg, rgba(6, 10, 20, 0.45) 0%, rgba(6, 10, 20, 0.65) 100%) !important;
+}
+
+body.has-wall:not(.dark) #wall-shade {
+  background: linear-gradient(180deg, rgba(245, 248, 252, 0.65) 0%, rgba(235, 242, 248, 0.80) 100%) !important;
 }
 
 body {
@@ -2083,12 +2109,22 @@ body {
 }
 
 body:not(.has-wall) #wallpaper,
-body.wall-clean #wallpaper {
+body.wall-clean #wallpaper,
+body:not(.has-wall) #wall-shade,
+body.wall-clean #wall-shade {
   display: none !important;
   opacity: 0 !important;
-  background-image: none !important;
 }
-#wall-shade { display: none !important; }
+
+body.has-wall #wallpaper {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+body.has-wall #wall-shade {
+  display: block !important;
+  opacity: 1 !important;
+}
 
 /* ---------- 2. 彻底废除所有圆角与胶囊形态，全站统一 0px 直角 ---------- */
 .top-area, .top-area.compact, #topbar,
