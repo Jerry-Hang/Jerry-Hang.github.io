@@ -1076,6 +1076,17 @@ impl Db {
         Ok(name)
     }
 
+    pub fn add_or_update_trusted_device(&self, device_id: &str, name: &str, pubkey: &str) -> Result<String, String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO trusted_devices(device_id, name, pubkey, created_at, last_seen, is_active) \
+             VALUES(?1, ?2, ?3, datetime('now'), datetime('now'), 1) \
+             ON CONFLICT(device_id) DO UPDATE SET name=?2, pubkey=?3, last_seen=datetime('now'), is_active=1",
+            params![device_id, name, pubkey],
+        ).map_err(|e| e.to_string())?;
+        Ok(name.to_string())
+    }
+
     pub fn is_trusted_device(&self, device_id: &str) -> bool {
         let conn = self.conn.lock().unwrap();
         let active: Option<i64> = conn.query_row(
@@ -1277,6 +1288,11 @@ mod tests {
         db.revoke_trusted_device("dev-123").unwrap();
         assert!(!db.is_trusted_device("dev-123"));
         assert_eq!(db.trusted_device_count(), 0);
+
+        // 管理员直接授权设备
+        db.add_or_update_trusted_device("dev-direct", "Direct Admin Phone", "pubkey-xyz").unwrap();
+        assert!(db.is_trusted_device("dev-direct"));
+        assert_eq!(db.trusted_device_count(), 1);
 
         let _ = std::fs::remove_file(&dir);
     }
