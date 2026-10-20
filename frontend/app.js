@@ -351,7 +351,9 @@ function pillHtml(p) {
   const tags = (p.tags || []).slice(0, 2).map(t => '<span class="p-tag">' + esc(t) + '</span>').join("");
   return '<div class="pill-wrap">' +
     '<button class="pill' + sel + '" data-idx="' + idx + '">' +
-      '<span class="p-date">' + esc(p.date || "") + '</span>' +
+      '<div class="pill-top">' +
+        '<span class="p-date">' + esc(p.date || "") + '</span>' +
+      '</div>' +
       '<span class="p-title">' + esc(p.title) + '</span>' +
       '<div class="p-meta">' + tags + '<span class="p-words">' + words.toLocaleString() + ' 字</span></div>' +
     '</button>' +
@@ -466,19 +468,21 @@ function renderSide() {
 /* ---------- 视图 ---------- */
 function showView(name) {
   $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+  $$("#side-mobile-nav .smn-item").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
   const doIt = () => {
     if (name !== "reader") { try { history.replaceState(null, "", "/"); } catch (e) { /* 忽略 */ } }
     $$(".view").forEach(v => v.classList.remove("on"));
     const v = document.getElementById("view-" + name);
     if (v) v.classList.add("on");
     $$("#tb-tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
+    $$("#side-mobile-nav .smn-item").forEach(b => b.classList.toggle("on", b.dataset.nav === name));
     document.body.classList.toggle("reading", name === "reader");
     // 全局保持个性化背景一致
     document.body.classList.toggle("home-bg", true);
     state.nav = name;
     if (name !== "reader") { state.sideView = "posts"; renderSide(); }
     if (name === "about") { renderAbout(); }
-    if (window.innerWidth <= 720) toggleSidebar(false);
+    if (window.innerWidth <= 768) toggleSidebar(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   if (document.startViewTransition) {
@@ -1302,7 +1306,7 @@ function renderAbout() {
     '<div class="about-layout">' +
       '<aside class="about-side">' +
         '<div class="avatar"><img src="/assets/avatar.jpg" alt=""></div>' +
-        '<h2>' + esc(SITE.title) + '</h2>' +
+        '<h2 class="about-name">' + esc(SITE.title) + '</h2>' +
         '<p class="a-sub">记录与折腾 · 纯静态博客</p>' +
         '<div class="sect"><h3 class="sect-t">分类</h3><div class="cap-wrap">' + catChips + '</div></div>' +
         '<div class="sect"><h3 class="sect-t">标签</h3><div class="cap-wrap">' + tagChips + '</div></div>' +
@@ -1319,10 +1323,10 @@ function renderAbout() {
           '<div class="stat"><b>' + tagsAll.size + '</b><span>标签</span></div>' +
           '<div class="stat"><b>' + totalWords.toLocaleString() + '</b><span>总字数</span></div>' +
         '</div>' +
-        '<div class="sect"><h3 class="sect-t">壁纸（' + (isLandscape() ? "横版" : "竖版") + '）</h3>' +
+        '<div class="sect"><h3 class="sect-t">全站背景壁纸（' + (isLandscape() ? "横版" : "竖版") + '）</h3>' +
           '<div class="wall-grid" id="wall-grid"></div>' +
         '</div>' +
-        '<p class="a-desc">一个用 Rust 命令行工具与原生 HTML / CSS / JS 打造的胶囊目录静态博客。左侧目录栏像抽屉一样展开：搜索、筛选、滚动胶囊列表；右侧是置顶的精选内容。</p>' +
+        '<p class="a-desc">基于纯正瑞士国际平面设计风格（Swiss International Typographic Style）打造的独立博客。全站遵循严谨直角几何体系、实体高对比材质与精细排版网格，剔除冗余修饰，专注于纯粹的文字与阅读体验。</p>' +
         '<p class="a-foot">© ' + new Date().getFullYear() + ' ' + esc(SITE.author) + ' · 记录与折腾</p>' +
       '</div>' +
     '</div>';
@@ -2028,11 +2032,22 @@ function injectAdminNavButton() {
   }
 }
 
+function initMobileNav() {
+  $$("#side-mobile-nav .smn-item").forEach(b => {
+    b.addEventListener("click", () => {
+      const nav = b.dataset.nav || "home";
+      showView(nav);
+      toggleSidebar(false);
+    });
+  });
+}
+
 /* ---------- 初始化 ---------- */
 (function init() {
   applyTheme();
   applyWall();
   renderAbout();
+  initMobileNav();
   // 侧栏初始状态：
   //   窄屏 —— 收起（汉堡抽屉，点按钮展开）
   //   宽屏 —— 默认展开，除非用户之前手动收起过
