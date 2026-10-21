@@ -1368,11 +1368,24 @@ function renderAll() {
 }
 
 /* ---------- 事件 ---------- */
-document.getElementById("side-collapse").addEventListener("click", () => toggleSidebar(false));
-document.getElementById("side-grip").addEventListener("click", () => toggleSidebar(true));
+const sideCollapseBtn = document.getElementById("side-collapse");
+if (sideCollapseBtn) {
+  sideCollapseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSidebar(false);
+  });
+}
+const sideGripBtn = document.getElementById("side-grip");
+if (sideGripBtn) {
+  sideGripBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSidebar(true);
+  });
+}
 const sidebarEl = document.getElementById("sidebar");
 if (sidebarEl) {
-  sidebarEl.addEventListener("click", () => {
+  sidebarEl.addEventListener("click", (e) => {
+    if (e.target.closest("#side-panel") || e.target.closest("#side-collapse")) return;
     if (!document.getElementById("layout").classList.contains("side-open")) {
       toggleSidebar(true);
     }
