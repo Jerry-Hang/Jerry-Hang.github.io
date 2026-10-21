@@ -72,7 +72,29 @@ const DEFAULT_PUBLIC_URL: &str = "http://127.0.0.1:8090/";
 /// Host 里带的是**管理端**的端口，直接拿去拼链接会指回管理端自己，
 /// 被 302 弹回登录页 —— 表现成「点了没反应」。这个坑实际踩过两次：
 /// 先是写死相对路径 `/`，再是直接拿 Host 拼。
-///
+/// 判断请求是否为 HTTPS 流量（包括 Cloudflare 隧道和反向代理下发的头部）
+fn is_https_request(headers: &HeaderMap) -> bool {
+    if let Some(proto) = headers.get("x-forwarded-proto").and_then(|v| v.to_str().ok()) {
+        if proto.eq_ignore_ascii_case("https") {
+            return true;
+        }
+    }
+    if let Some(cf_visitor) = headers.get("cf-visitor").and_then(|v| v.to_str().ok()) {
+        if cf_visitor.contains("\"https\"") {
+            return true;
+        }
+    }
+    false
+}
+
+/// 往 HTML 属性里插值时的最小转义，避免属性结构被破坏。
+fn html_attr_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 /// BLOG_PUBLIC_URL 用来兜底（没有 Host 头时），默认 http://127.0.0.1:8090/。
 fn public_url(headers: &HeaderMap) -> String {
     let ext_port = env::var("BLOG_EXT_ADDR")
@@ -93,13 +115,21 @@ fn public_url(headers: &HeaderMap) -> String {
         return configured;
     }
 
+    // 校验 Host 头部字符合法性，防止注入攻击
+    let is_valid = h.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == ':' || c == '[' || c == ']');
+    if !is_valid {
+        return configured;
+    }
+
+    let scheme = if is_https_request(headers) { "https" } else { "http" };
+
     // IPv6 字面量：[::1]:8091
     if let Some(rest) = h.strip_prefix('[') {
         if let Some((addr, port)) = rest.split_once("]:") {
             return if port == ext_port {
-                format!("http://[{addr}]:{ext_port}/")
+                format!("{scheme}://[{addr}]:{ext_port}/")
             } else {
-                format!("http://[{addr}]/")
+                format!("{scheme}://[{addr}]/")
             };
         }
     }
@@ -108,27 +138,20 @@ fn public_url(headers: &HeaderMap) -> String {
         // 带端口：是管理端端口就换成前台端口，否则说明本来指向别处，保留
         Some((name, port)) => {
             if port == ext_port {
-                format!("http://{name}:{port}/")
+                format!("{scheme}://{name}:{port}/")
             } else {
-                format!("http://{name}:{ext_port}/")
+                format!("{scheme}://{name}:{ext_port}/")
             }
         }
         // 不带端口（经隧道，浏览器默认 80/443）：直接用域名
-        None => format!("http://{h}/"),
+        None => format!("{scheme}://{h}/"),
     }
 }
 
-/// 把占位符换成实际地址。
+/// 把占位符换成实际地址，并进行属性结构转义。
 fn inject_public_url(html: &str, url: &str) -> String {
-    html.replace(PUBLIC_URL_PLACEHOLDER, url)
-}
-
-/// 往 HTML 属性里插值时的最小转义，避免用户名里的引号破坏属性结构。
-fn html_attr_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    let safe_url = html_attr_escape(url);
+    html.replace(PUBLIC_URL_PLACEHOLDER, &safe_url)
 }
 
 /// 判断这次请求是不是「本机访问」。
@@ -390,6 +413,11 @@ impl IpRateLimiter {
             scan_count: 0,
             banned_until: None,
         });
+        if entry.banned_until.is_none() && now.duration_since(entry.window_start) >= Duration::from_secs(30) {
+            entry.window_start = now;
+            entry.req_count = 0;
+            entry.scan_count = 0;
+        }
         entry.scan_count += 1;
         if entry.scan_count >= 15 {
             // 连续 15 次 404，临时封禁 5 分钟
@@ -467,7 +495,7 @@ impl IpRateLimiter {
                     return Err("IP 处于临时限流/封禁中");
                 }
             }
-            if state.scan_count >= 10 {
+            if state.scan_count >= 15 {
                 return Err("尝试次数过多，请稍后再试");
             }
         }
@@ -484,7 +512,12 @@ impl IpRateLimiter {
             scan_count: 0,
             banned_until: None,
         });
-        entry.scan_count += 5; // 3 次失败即封禁 5 分钟
+        if entry.banned_until.is_none() && now.duration_since(entry.window_start) >= Duration::from_secs(30) {
+            entry.window_start = now;
+            entry.req_count = 0;
+            entry.scan_count = 0;
+        }
+        entry.scan_count += 5; // 3 次失败即封禁 5 分钟 (5 -> 10 -> 15)
         if entry.scan_count >= 15 {
             entry.banned_until = Some(now + Duration::from_secs(300));
         }
@@ -729,6 +762,7 @@ async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Resp
     if let Err(msg) = state.rate_limiter.check_pair_rate(ip) {
         return json_response(StatusCode::TOO_MANY_REQUESTS, json!({"error": msg}));
     }
+    let is_https = is_https_request(req.headers());
     let body = read_json(req).await;
     let code = body.get("code").and_then(|v| v.as_str()).unwrap_or("").trim();
     let dev_id_raw = body.get("device_id").and_then(|v| v.as_str()).unwrap_or("").trim();
@@ -742,10 +776,8 @@ async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Resp
     }
 
     let pwd_sha = state.cfg.read().unwrap().password_sha256.clone();
-    let is_admin_pwd = !code.is_empty() && (
-        code == pwd_sha ||
-        crate::sha256::sha256_hex(code.as_bytes()) == pwd_sha
-    );
+    let code_sha = crate::sha256::sha256_hex(code.as_bytes());
+    let is_admin_pwd = !code.is_empty() && ct_eq(code_sha.as_bytes(), pwd_sha.as_bytes());
 
     let verify_res = if is_admin_pwd {
         let dev_name = if !client_name.is_empty() { client_name.to_string() } else { "管理员受信任设备".to_string() };
@@ -765,11 +797,12 @@ async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Resp
                 "name": final_name,
                 "device_id": dev_id
             }));
-            let cookie_str = format!("blog_trusted={tok}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict");
+            let sec_flag = if is_https { "; Secure" } else { "" };
+            let cookie_str = format!("blog_trusted={tok}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict{sec_flag}");
             if let Ok(h) = HeaderValue::from_str(&cookie_str) {
                 resp.headers_mut().append(header::SET_COOKIE, h);
             }
-            let dev_cookie = format!("blog_dev_id={dev_id}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict");
+            let dev_cookie = format!("blog_dev_id={dev_id}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict{sec_flag}");
             if let Ok(h) = HeaderValue::from_str(&dev_cookie) {
                 resp.headers_mut().append(header::SET_COOKIE, h);
             }
@@ -788,14 +821,16 @@ async fn handle_post_likes_api(state: &Arc<AppState>, ip: &str, req: Request) ->
     let Some(rest) = path.strip_prefix("/api/posts/") else {
         return not_found();
     };
-    if let Some(slug) = rest.strip_suffix("/likes") {
+    if let Some(slug_raw) = rest.strip_suffix("/likes") {
+        let slug = percent_decode(slug_raw).unwrap_or_else(|| slug_raw.to_string());
         if method == Method::GET || method == Method::HEAD {
-            let count = state.db.get_likes(slug);
+            let count = state.db.get_likes(&slug);
             return json_response(StatusCode::OK, json!({"slug": slug, "likes": count}));
         }
-    } else if let Some(slug) = rest.strip_suffix("/like") {
+    } else if let Some(slug_raw) = rest.strip_suffix("/like") {
+        let slug = percent_decode(slug_raw).unwrap_or_else(|| slug_raw.to_string());
         if method == Method::POST {
-            match state.db.add_like(slug, ip) {
+            match state.db.add_like(&slug, ip) {
                 Ok(total) => {
                     return json_response(StatusCode::OK, json!({"slug": slug, "likes": total}));
                 }
@@ -871,6 +906,7 @@ async fn local_dispatch(state: &Arc<AppState>, peer: &SocketAddr, req: Request) 
 }
 
 async fn local_dispatch_internal(state: &Arc<AppState>, req: Request, is_loopback: bool) -> Response {
+    let is_https = is_https_request(req.headers());
     let method = req.method().clone();
     let path = req.uri().path().to_string();
     let is_get = method == Method::GET || method == Method::HEAD;
@@ -903,7 +939,7 @@ async fn local_dispatch_internal(state: &Arc<AppState>, req: Request, is_loopbac
         } else {
             read_handler(state, &path, method == Method::HEAD, true, req.headers()).await
         };
-        add_cookies(&mut resp, &cookies);
+        add_cookies(&mut resp, &cookies, is_https);
         return resp;
     }
 
@@ -917,7 +953,7 @@ async fn local_dispatch_internal(state: &Arc<AppState>, req: Request, is_loopbac
     } else {
         handle_api(state, &method, &path, req).await
     };
-    add_cookies(&mut resp, &cookies);
+    add_cookies(&mut resp, &cookies, is_https);
     resp
 }
 
@@ -997,20 +1033,21 @@ fn check_auth(state: &AppState, headers: &HeaderMap, need_priv: bool) -> Result<
     Ok(out)
 }
 
-fn add_cookies(resp: &mut Response, cookies: &[(String, String, i64)]) {
+fn add_cookies(resp: &mut Response, cookies: &[(String, String, i64)], secure: bool) {
+    let sec_flag = if secure { "; Secure" } else { "" };
     for (name, value, maxage) in cookies {
-        let v = format!("{name}={value}; Path=/; HttpOnly; Max-Age={maxage}; SameSite=Strict");
+        let v = format!("{name}={value}; Path=/; HttpOnly; Max-Age={maxage}; SameSite=Strict{sec_flag}");
         if let Ok(h) = HeaderValue::from_str(&v) {
             resp.headers_mut().append(header::SET_COOKIE, h);
         }
     }
 }
 
-async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool, local: bool, headers: &HeaderMap) -> Response {
+async fn read_handler(state: &Arc<AppState>, path: &str, head: bool, local: bool, headers: &HeaderMap) -> Response {
     match path {
-        "/posts.json" => serve_posts_json(state, headers).await,
-        _ if path.starts_with("/post/") => serve_post_html(state, &path["/post/".len()..]).await,
-        _ => read_static(state, path, local, headers).await,
+        "/posts.json" => serve_posts_json(state, headers, head).await,
+        _ if path.starts_with("/post/") => serve_post_html(state, &path["/post/".len()..], head).await,
+        _ => read_static(state, path, head, local, headers).await,
     }
 }
 
@@ -1019,7 +1056,7 @@ async fn read_handler(state: &Arc<AppState>, path: &str, _head: bool, local: boo
 /// local = 是否本机访问（见 is_local_access）。
 ///         为 false 时把「查看后台」那段删掉 —— 管理端只绑 127.0.0.1，
 ///         局域网和外网的人点了也打不开，不如不显示。
-async fn read_static(state: &Arc<AppState>, path: &str, local: bool, headers: &HeaderMap) -> Response {
+async fn read_static(state: &Arc<AppState>, path: &str, head: bool, local: bool, headers: &HeaderMap) -> Response {
     // 先确认是 HTML 才读进内存做替换；其余文件走原来的静态文件路径
     let is_html = match resolve_target(&state.root_canon, path) {
         Some(ref f) => content_type(f).starts_with("text/html"),
@@ -1027,7 +1064,7 @@ async fn read_static(state: &Arc<AppState>, path: &str, local: bool, headers: &H
     };
 
     if !is_html {
-        return serve_static(&state.root_canon, path, headers).await;
+        return serve_static(&state.root_canon, path, headers, head).await;
     }
 
     let Some(file) = resolve_target(&state.root_canon, path) else {
@@ -1038,10 +1075,22 @@ async fn read_static(state: &Arc<AppState>, path: &str, local: bool, headers: &H
         return not_found();
     };
 
-    html_response(if local { text } else { strip_local_only(&text) })
+    let final_text = if local { text } else { strip_local_only(&text) };
+    let len = final_text.len();
+    let resp = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .header(header::CONTENT_LENGTH, len.to_string())
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    if head {
+        resp.body(Body::empty()).unwrap()
+    } else {
+        resp.body(Body::from(final_text)).unwrap()
+    }
 }
 
-async fn serve_posts_json(state: &Arc<AppState>, headers: &HeaderMap) -> Response {
+async fn serve_posts_json(state: &Arc<AppState>, headers: &HeaderMap, head: bool) -> Response {
     let posts = state.db.list_posts();
     let arr: Vec<serde_json::Value> = posts.iter().map(post_json).collect();
     let body = serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string());
@@ -1057,25 +1106,31 @@ async fn serve_posts_json(state: &Arc<AppState>, headers: &HeaderMap) -> Respons
                 .unwrap();
         }
     }
-    Response::builder()
+    let len = body.len();
+    let resp = Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
+        .header(header::CONTENT_LENGTH, len.to_string())
         .header(header::CACHE_CONTROL, CACHE_CONTROL)
         .header(header::ETAG, etag)
-        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-        .body(Body::from(body))
-        .unwrap()
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    if head {
+        resp.body(Body::empty()).unwrap()
+    } else {
+        resp.body(Body::from(body)).unwrap()
+    }
 }
 
-async fn serve_post_html(state: &Arc<AppState>, slug: &str) -> Response {
-    match state.db.get_by_slug(slug) {
+async fn serve_post_html(state: &Arc<AppState>, slug: &str, head: bool) -> Response {
+    let decoded = percent_decode(slug).unwrap_or_else(|| slug.to_string());
+    match state.db.get_by_slug(&decoded) {
         Some(p) => {
             let title = html_escape(&p.title);
             let date = html_escape(&p.date);
             let doc = format!(
                 "<!DOCTYPE html><html lang=zh><head><meta charset=\"utf-8\"><meta name=viewport content=\"width=device-width,initial-scale=1\"><title>{title}</title><style>\
                 :root{{--font:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,PingFang SC,Microsoft YaHei,sans-serif}}\
-                body{{margin:0;min-height:100vh;font-family:var(--font);color:#e2e8f0;color:#e2e8f0;background:#05070f;background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.3),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.26),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.2),transparent 55%),linear-gradient(180deg,#070b18,#0d1226);background-attachment:fixed}}\
+                body{{margin:0;min-height:100vh;font-family:var(--font);color:#e2e8f0;background:#05070f;background-image:radial-gradient(1100px 750px at 12% 8%,rgba(56,189,248,.3),transparent 55%),radial-gradient(1000px 700px at 88% 16%,rgba(168,85,247,.26),transparent 55%),radial-gradient(900px 900px at 50% 105%,rgba(16,185,129,.2),transparent 55%),linear-gradient(180deg,#070b18,#0d1226);background-attachment:fixed}}\
                 body::before{{content:\"\";position:fixed;inset:0;pointer-events:none;opacity:.05;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")}}\
                 .card{{max-width:820px;margin:32px auto;padding:28px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:24px;backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);box-shadow:0 10px 40px rgba(0,0,0,.35);position:relative;overflow:hidden}}\
                 .card::before{{content:\"\";position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(56,189,248,.35),transparent 70%);filter:blur(10px);pointer-events:none}}\
@@ -1086,14 +1141,19 @@ async fn serve_post_html(state: &Arc<AppState>, slug: &str) -> Response {
                 </style></head><body><div class=card><h1>{title}</h1><p class=date>{date}</p><article>{}</article></div></body></html>",
                 p.content_html
             );
-            Response::builder()
+            let len = doc.len();
+            let resp = Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+                .header(header::CONTENT_LENGTH, len.to_string())
                 .header(header::CACHE_CONTROL, CACHE_CONTROL)
                 .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-                .header(header::X_FRAME_OPTIONS, "SAMEORIGIN")
-                .body(Body::from(doc))
-                .unwrap()
+                .header(header::X_FRAME_OPTIONS, "SAMEORIGIN");
+            if head {
+                resp.body(Body::empty()).unwrap()
+            } else {
+                resp.body(Body::from(doc)).unwrap()
+            }
         }
         None => not_found(),
     }
@@ -1307,7 +1367,8 @@ fn query_param(uri: &axum::http::Uri, key: &str) -> Option<String> {
     for pair in query.split('&') {
         if let Some((k, v)) = pair.split_once('=') {
             if k == key {
-                return percent_decode(v);
+                let replaced = v.replace('+', " ");
+                return percent_decode(&replaced);
             }
         }
     }
@@ -1325,7 +1386,7 @@ fn json_response(status: StatusCode, value: serde_json::Value) -> Response {
         .unwrap()
 }
 
-async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap) -> Response {
+async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap, head: bool) -> Response {
     let Some(file) = resolve_target(root_canon, target) else {
         return not_found();
     };
@@ -1361,6 +1422,35 @@ async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap) 
                     .unwrap();
             }
         }
+    }
+
+    if head {
+        let mut resp = Response::new(Body::empty());
+        *resp.status_mut() = StatusCode::OK;
+        resp.headers_mut().insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_str(&ctype)
+                .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+        );
+        resp.headers_mut().insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&len.to_string()).unwrap(),
+        );
+        resp.headers_mut()
+            .insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
+        resp.headers_mut()
+            .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+
+        let cc = if is_html || is_code {
+            "no-cache, must-revalidate"
+        } else {
+            CACHE_CONTROL
+        };
+        resp.headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
+        resp.headers_mut()
+            .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+        return resp;
     }
 
     match fs::read(&file) {
@@ -1727,7 +1817,7 @@ async fn handle_local_api(
 
             let cookies = issue_session(state, false);
             let mut resp = json_response(StatusCode::OK, json!({ "ok": true }));
-            add_cookies(&mut resp, &cookies);
+            add_cookies(&mut resp, &cookies, is_https_request(req.headers()));
             Some(resp)
         }
 
@@ -1739,8 +1829,9 @@ async fn handle_local_api(
                 }
             }
             let mut resp = json_response(StatusCode::OK, json!({ "ok": true }));
+            let sec_flag = if is_https_request(req.headers()) { "; Secure" } else { "" };
             for key in ["blog_admin", "blog_priv"] {
-                let v = format!("{key}=; Path=/; HttpOnly; Max-Age=0; SameSite=Strict");
+                let v = format!("{key}=; Path=/; HttpOnly; Max-Age=0; SameSite=Strict{sec_flag}");
                 if let Ok(h) = HeaderValue::from_str(&v) {
                     resp.headers_mut().append(header::SET_COOKIE, h);
                 }
@@ -1753,7 +1844,7 @@ async fn handle_local_api(
             if let Some(name) = path.strip_prefix("/_admin/") {
                 if let Some(cookies) = session_cookies_ok(state, req.headers()) {
                     let mut resp = admin_asset(name).unwrap_or_else(not_found);
-                    add_cookies(&mut resp, &cookies);
+                    add_cookies(&mut resp, &cookies, is_https_request(req.headers()));
                     return Some(resp);
                 }
                 return Some(redirect_to_login());
@@ -1922,8 +2013,9 @@ mod tests {
         limiter.record_pair_fail(target_ip);
         assert!(limiter.check_pair_rate(target_ip).is_ok());
         limiter.record_pair_fail(target_ip);
-        assert!(limiter.check_pair_rate(target_ip).is_err());
+        assert!(limiter.check_pair_rate(target_ip).is_ok());
         limiter.record_pair_fail(target_ip);
+        assert!(limiter.check_pair_rate(target_ip).is_err());
 
         // 验证已进入封禁列表
         let banned = limiter.list_banned();

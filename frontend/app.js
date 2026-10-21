@@ -143,10 +143,17 @@ function mdInline(src) {
   s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
   s = s.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
   s = s.replace(/_([^_\n]+)_/g, "<em>$1</em>");
-  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, '<img src="$2" alt="$1" loading="lazy">');
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, function(m, alt, src) {
+    const u = src.trim();
+    if (!/^(https?:|\/|data:image\/)/i.test(u)) return "";
+    return '<img src="' + esc(u) + '" alt="' + alt + '" loading="lazy">';
+  });
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, txt, url) {
-    const u = url.replace(/[)\s"]+$/, "");
-    return /^(https?:|mailto:|#)/.test(u) ? '<a href="' + u + '" target="_blank" rel="noopener">' + txt + '</a>' : '<a href="' + u + '">' + txt + '</a>';
+    const u = url.replace(/[)\s"]+$/, "").trim();
+    if (!/^(https?:|mailto:|#|\/)/i.test(u)) return esc(txt);
+    return /^(https?:|mailto:)/i.test(u)
+      ? '<a href="' + esc(u) + '" target="_blank" rel="noopener">' + txt + '</a>'
+      : '<a href="' + esc(u) + '">' + txt + '</a>';
   });
   return s;
 }
@@ -1363,6 +1370,14 @@ function renderAll() {
 /* ---------- 事件 ---------- */
 document.getElementById("side-collapse").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("side-grip").addEventListener("click", () => toggleSidebar(true));
+const sidebarEl = document.getElementById("sidebar");
+if (sidebarEl) {
+  sidebarEl.addEventListener("click", () => {
+    if (!document.getElementById("layout").classList.contains("side-open")) {
+      toggleSidebar(true);
+    }
+  });
+}
 document.getElementById("scrim").addEventListener("click", () => toggleSidebar(false));
 document.getElementById("tb-theme").addEventListener("click", toggleTheme);
 document.getElementById("side-search").addEventListener("input", e => { state.q = e.target.value; renderSide(); });
@@ -1570,21 +1585,46 @@ async function fetchLikes(slug) {
     const d = await res.json();
     const el = document.getElementById("r-like-count");
     if (el) el.textContent = d.likes > 0 ? d.likes + " 赞" : "点赞";
+    try {
+      const likedPosts = JSON.parse(localStorage.getItem("jb_liked_posts") || "[]");
+      if (likedPosts.includes(slug)) {
+        const btn = document.getElementById("r-like");
+        if (btn) {
+          btn.classList.add("liked");
+          btn.disabled = true;
+          btn.title = "已赞过此文";
+        }
+      }
+    } catch (e) {}
   } catch (e) { /* 静默失败 */ }
 }
 
 async function submitLike(slug) {
   const btn = document.getElementById("r-like");
   const el = document.getElementById("r-like-count");
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
   btn.classList.add("liked");
   try {
     const res = await fetch("/api/posts/" + encodeURIComponent(slug) + "/like", { method: "POST" });
-    if (!res.ok) { showToast("频率过快，请稍后"); return; }
+    if (!res.ok) {
+      if (res.status === 429) showToast("点赞过于频繁，请稍后");
+      else showToast("点赞失败");
+      btn.disabled = false;
+      return;
+    }
     const d = await res.json();
     if (el) el.textContent = d.likes + " 赞";
     showToast("+1 感谢喜欢！");
+    try {
+      const likedPosts = JSON.parse(localStorage.getItem("jb_liked_posts") || "[]");
+      if (!likedPosts.includes(slug)) {
+        likedPosts.push(slug);
+        localStorage.setItem("jb_liked_posts", JSON.stringify(likedPosts));
+      }
+    } catch (e) {}
   } catch (e) {
+    btn.disabled = false;
     showToast("网络连接失败");
   }
 }
@@ -1845,7 +1885,7 @@ function generateQrSvg(str, size) {
 /* ---------- 可信设备远程后台检测与配对 ---------- */
 async function initTrustedDeviceAuth() {
   const params = new URLSearchParams(window.location.search);
-  const pairCode = params.get("pair") || params.get("auth");
+  const pairCode = params.get("pair");
   if (pairCode) {
     let devId = localStorage.getItem("jb_dev_id");
     if (!devId) {
@@ -1868,7 +1908,6 @@ async function initTrustedDeviceAuth() {
         showToast("设备授权成功！已永久解锁后台管理入口");
         injectAdminNavButton();
         params.delete("pair");
-        params.delete("auth");
         const newSearch = params.toString();
         const newUrl = window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
         history.replaceState(null, "", newUrl);
