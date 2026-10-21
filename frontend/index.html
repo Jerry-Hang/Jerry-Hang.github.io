@@ -988,7 +988,7 @@ body.wall-clean {
           <h1 class="swiss-title">关于</h1>
           <p class="swiss-desc">关于作者与博客设计理念。</p>
         </div>
-        <div class="about-card" id="about-body"></div>
+        <div id="about-body"></div>
       </div>
     </section>
   </div>
@@ -1800,11 +1800,11 @@ body.home-bg::before { display: none !important; }
   display: block !important;
 }
 .icon-btn, .tb-menu {
-  width: 32px !important;
-  height: 32px !important;
+  width: 34px !important;
+  height: 34px !important;
   border-radius: 0px !important;
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
+  background: transparent !important;
+  border: none !important;
   color: var(--text-soft) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2299,11 +2299,12 @@ body.dark .top-area #topbar {
 #tb-tabs,
 .top-area.compact #tb-tabs {
   display: flex !important;
-  align-items: center !important;
-  gap: 18px !important;
+  align-items: stretch !important;
+  gap: 16px !important;
   margin-left: 20px !important;
   margin-right: auto !important;
   opacity: 1 !important;
+  height: 48px !important;
   max-height: 48px !important;
   overflow: visible !important;
   flex: 0 0 auto !important;
@@ -2316,7 +2317,10 @@ body.dark .top-area #topbar {
   letter-spacing: 0.04em !important;
   text-transform: uppercase !important;
   color: var(--text-soft) !important;
-  padding: 6px 2px !important;
+  height: 48px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 10px !important;
   border-radius: 0px !important;
   background: none !important;
   border: none !important;
@@ -2335,10 +2339,10 @@ body.dark .top-area #topbar {
 #tb-tabs button.on::after {
   content: "" !important;
   position: absolute !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: -4px !important;
-  width: 100% !important;
+  left: 10px !important;
+  right: 10px !important;
+  bottom: 0 !important;
+  width: auto !important;
   height: 2px !important;
   background: var(--accent) !important;
   border-radius: 0px !important;
@@ -2381,17 +2385,17 @@ body.dark .tb-admin:hover {
   color: #000000 !important;
 }
 
-/* 顶栏图标按钮：纯几何方块 */
+/* 顶栏图标按钮：纯净无框瑞士功用按钮 */
 .icon-btn,
 .tb-menu,
 #tb-search,
 #tb-theme {
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
   border-radius: 0px !important;
-  border: 1px solid var(--border) !important;
-  background: var(--surface) !important;
+  border: none !important;
+  background: transparent !important;
   color: var(--text-soft) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2399,7 +2403,7 @@ body.dark .tb-admin:hover {
   padding: 0 !important;
   box-shadow: none !important;
   transform: none !important;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+  transition: background 0.15s ease, color 0.15s ease !important;
 }
 .icon-btn:hover,
 .tb-menu:hover,
@@ -2407,7 +2411,7 @@ body.dark .tb-admin:hover {
 #tb-theme:hover {
   background: var(--pill-hover) !important;
   color: var(--text) !important;
-  border-color: var(--border-strong) !important;
+  border: none !important;
   transform: none !important;
 }
 
@@ -3139,7 +3143,120 @@ body.dark .auth-box .am-submit:hover {
   padding: 0 3px !important;
 }
 
-/* 关于页面排版与壁纸 4 栏风景缩略图 */
+/* 关于页面：单一大卡片，内部去嵌套化纯净排版 */
+#view-about .about-wrap {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0px !important;
+  padding: 32px 36px 40px !important;
+  box-shadow: none !important;
+}
+#view-about .about-card,
+#view-about .about-side,
+#view-about .about-main {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+#view-about .about-layout {
+  display: grid !important;
+  grid-template-columns: 240px 1fr !important;
+  gap: 36px !important;
+  align-items: start !important;
+  margin-top: 24px !important;
+}
+#view-about .about-side {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  gap: 12px !important;
+  position: static !important;
+  border-right: 1px solid var(--border) !important;
+  padding-right: 28px !important;
+}
+#view-about .about-side .avatar {
+  width: 72px !important;
+  height: 72px !important;
+  max-width: 72px !important;
+  max-height: 72px !important;
+  overflow: hidden !important;
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  flex: 0 0 auto !important;
+  margin: 0 auto 4px auto !important;
+}
+#view-about .about-side .avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+#view-about .about-side .side-cap {
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text-soft) !important;
+}
+#view-about .about-side .a-links {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+#view-about .about-side .link-btn {
+  width: 100% !important;
+  justify-content: center !important;
+  border-radius: 0px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+  padding: 8px 12px !important;
+  transition: all .15s ease !important;
+}
+#view-about .about-side .link-btn:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+#view-about .about-main {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+  min-width: 0 !important;
+}
+#view-about .about-stats {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 12px !important;
+  margin: 4px 0 16px !important;
+}
+#view-about .stat {
+  padding: 12px 8px !important;
+  border-radius: 0px !important;
+  text-align: center !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+}
+@media (max-width: 768px) {
+  #view-about .about-layout {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+  #view-about .about-side {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding-right: 0 !important;
+    padding-bottom: 24px !important;
+  }
+  #view-about .about-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
 .about-side h2, .about-name {
   font-size: 16px !important;
   font-weight: 700 !important;
@@ -3253,34 +3370,32 @@ body.dark .auth-box .am-submit:hover {
   color: #ffffff !important;
 }
 
-/* 侧栏收起状态优雅渲染（避免浅色模式下出现白柱） */
+/* 侧栏收起状态：纯净直角边框，移除错位三角形，整条侧边栏点击展开 */
 #layout:not(.side-open) #sidebar {
   background: var(--surface) !important;
   border-right: 1px solid var(--border) !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  transition: background-color 0.15s ease !important;
+}
+#layout:not(.side-open) #side-panel {
+  display: none !important;
+}
+#layout:not(.side-open) #sidebar:hover {
+  background: var(--pill-hover) !important;
 }
 #side-grip {
-  background: var(--surface) !important;
-  border-right: 1px solid var(--border) !important;
-  position: relative !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
 }
 #side-grip::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  opacity: 0.6;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-#side-grip:hover::before {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1.15);
+  display: none !important;
+  content: none !important;
 }
 
 /* 彻底清除桌面端汉堡按钮与移动抽屉导航 */
