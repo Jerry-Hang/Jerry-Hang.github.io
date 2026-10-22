@@ -124,7 +124,7 @@
     const fg3 = cssVar('--fg-3', 'rgba(60,60,67,.3)');
     const fg2 = cssVar('--fg-2', 'rgba(60,60,67,.6)');
     const sep = cssVar('--sep', 'rgba(60,60,67,.13)');
-    color = color || cssVar('--blue', '#007aff');
+    color = color || cssVar('--accent', '#e60000');
 
     data = (data || []).filter(d => d && typeof d.v === 'number');
 
@@ -320,10 +320,10 @@
             memStatus.style.color = 'var(--orange, #ff9500)';
           }
         } else {
-          memBar.style.background = 'var(--blue, #007aff)';
+          memBar.style.background = 'var(--accent, #e60000)';
           if (memStatus) {
             memStatus.textContent = '满血极速模式（正常）';
-            memStatus.style.color = 'var(--green, #34c759)';
+            memStatus.style.color = 'var(--green, #10b981)';
           }
         }
       }
@@ -847,8 +847,8 @@
           renderBars($('bars-sec'), all.filter(x => x.category !== 'normal'), c => CAT_COLOR[c] || 'c-blue');
           const hourly = (stats.hourly || []).map(x => ({ label: (x.h ?? '') + ':00', v: x.count ?? x.c ?? 0 }));
           const daily = (stats.daily || []).map(x => ({ label: x.date ?? x.d ?? '', v: x.count ?? x.c ?? 0 }));
-          drawLine($('c-hourly'), hourly, cssVar('--blue', '#007aff'));
-          drawLine($('c-daily'), daily, cssVar('--purple', '#af52de'));
+          drawLine($('c-hourly'), hourly, cssVar('--accent', '#e60000'));
+          drawLine($('c-daily'), daily, cssVar('--purple', '#8b5cf6'));
         }
       });
     }
@@ -864,7 +864,7 @@
     charts.hourly = () => {
       if (!stats) return;
       const hourly = (stats.hourly || []).map(x => ({ label: (x.h ?? '') + ':00', v: x.count ?? x.c ?? 0 }));
-      origDrawLine($('c-hourly'), hourly, cssVar('--blue', '#007aff'));
+      origDrawLine($('c-hourly'), hourly, cssVar('--accent', '#e60000'));
     };
     charts.daily = () => {
       if (!stats) return;
