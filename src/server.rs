@@ -806,6 +806,14 @@ async fn handle_auth_pair(state: &Arc<AppState>, ip: &str, req: Request) -> Resp
             if let Ok(h) = HeaderValue::from_str(&dev_cookie) {
                 resp.headers_mut().append(header::SET_COOKIE, h);
             }
+            if is_admin_pwd {
+                let admin_tok = random_token();
+                let _ = state.db.create_session(&admin_tok, "admin", 7 * 24 * 3600);
+                let admin_cookie = format!("blog_admin={admin_tok}; Path=/; Max-Age=604800; HttpOnly; SameSite=Strict{sec_flag}");
+                if let Ok(h) = HeaderValue::from_str(&admin_cookie) {
+                    resp.headers_mut().append(header::SET_COOKIE, h);
+                }
+            }
             resp
         }
         Err(e) => {
