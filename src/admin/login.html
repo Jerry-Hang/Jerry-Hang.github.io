@@ -12,73 +12,118 @@
 /*__CSS__*/
 </style>
 <style>
-/* 登录页专用布局 */
+/* 登录页专用布局 —— 瑞士国际主义平面风格 */
 body.login {
   display: grid;
   place-items: center;
   padding: 24px;
   background: var(--bg);
+  min-height: 100vh;
 }
 
-/* 背景柔和色晕（跟随系统主题） */
 body.login::before {
-  content: "";
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(700px 480px at 18% 8%,  var(--blue-soft), transparent 62%),
-    radial-gradient(620px 440px at 84% 92%, var(--purple) , transparent 64%);
-  opacity: .55;
+  display: none !important;
 }
 
 .login-card {
   position: relative; z-index: 1;
-  width: min(380px, 100%);
+  width: min(400px, 100%);
   background: var(--bg-elevated);
-  border-radius: 22px;
-  box-shadow: var(--shadow-m);
-  padding: 34px 30px 30px;
+  border: 1px solid var(--border);
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  padding: 44px 36px 40px;
 }
 
 .login-card .brand {
-  width: 54px; height: 54px;
-  border-radius: 15px;
-  background: var(--blue);
+  width: 44px; height: 44px;
+  border-radius: 0px !important;
+  background: var(--accent);
   color: #fff;
-  font-size: 26px; font-weight: 700;
+  font-family: var(--font);
+  font-size: 22px; font-weight: 700;
   display: grid; place-items: center;
-  margin: 0 auto 16px;
-  box-shadow: 0 6px 18px var(--blue-soft);
+  margin: 0 auto 18px;
+  border: 1px solid var(--accent);
+  box-shadow: none !important;
 }
 
 .login-card h1 {
-  font-size: 21px; font-weight: 600;
-  text-align: center; margin: 0 0 5px;
-  letter-spacing: -.02em;
+  font-family: var(--font);
+  font-size: 20px; font-weight: 700;
+  text-align: center; margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--fg);
 }
 .login-card .hint {
-  font-size: 13.5px; color: var(--fg-2);
-  text-align: center; margin: 0 0 24px;
+  font-family: var(--font);
+  font-size: 11px; font-weight: 600;
+  color: var(--fg-2);
+  text-align: center; margin: 0 0 26px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.login-card .field { margin-bottom: 14px; }
-.login-card .input { padding: 12px 14px; font-size: 15px; }
+.login-card .field { margin-bottom: 16px; }
+.login-card .field label {
+  display: block;
+  font-family: var(--font);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-2);
+  margin-bottom: 6px;
+}
+.login-card .input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: var(--font);
+  border-radius: 0px !important;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+  transition: border-color .15s ease;
+}
+.login-card .input:focus {
+  border-color: var(--fg);
+  background: var(--bg-elevated);
+  box-shadow: none;
+}
 
 .login-card .btn.primary {
   width: 100%;
   padding: 12px;
-  font-size: 15px; font-weight: 600;
-  border-radius: 11px;
-  margin-top: 6px;
+  font-family: var(--font);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 0px !important;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  margin-top: 8px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.login-card .btn.primary:hover {
+  background: #cc0000;
+  border-color: #cc0000;
 }
 
 .err {
-  font-size: 13px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--red);
   background: var(--red-soft);
-  border-radius: 9px;
-  padding: 9px 12px;
-  margin-bottom: 14px;
+  border: 1px solid var(--red);
+  border-radius: 0px !important;
+  padding: 10px 14px;
+  margin-bottom: 16px;
   display: none;
 }
 .err.show { display: block; animation: shake .3s; }
@@ -88,12 +133,12 @@ body.login::before {
   75%     { transform: translateX(4px); }
 }
 
-/* 加载中的小转圈 */
+/* 加载指示 */
 .spin {
-  width: 15px; height: 15px;
+  width: 14px; height: 14px;
   border: 2px solid rgba(255,255,255,.35);
   border-top-color: #fff;
-  border-radius: 50%;
+  border-radius: 0px !important;
   animation: rot .7s linear infinite;
   display: none;
 }
@@ -102,12 +147,15 @@ body.login::before {
 .btn.loading .label { opacity: .75; }
 
 .login-foot {
-  margin-top: 22px;
+  margin-top: 26px;
   text-align: center;
-  font-size: 12.5px; color: var(--fg-3);
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-3);
 }
-.login-foot a { color: var(--fg-2); text-decoration: none; }
-.login-foot a:hover { color: var(--blue); }
+.login-foot a { color: var(--fg-2); text-decoration: none; transition: color .15s ease; }
+.login-foot a:hover { color: var(--accent); }
 </style>
 </head>
 <body class="login">
@@ -115,7 +163,7 @@ body.login::before {
 <form class="login-card" id="f" autocomplete="on">
   <div class="brand">J</div>
   <h1>博客后台</h1>
-  <p class="hint">请输入密码</p>
+  <p class="hint">SWISS AUTHENTICATION · 凭证验证</p>
 
   <div class="err" id="err"></div>
 
@@ -125,17 +173,17 @@ body.login::before {
   <input type="hidden" id="u" name="username" value="__USERNAME__">
 
   <div class="field">
-    <label for="p">密码</label>
+    <label for="p">管理员密码</label>
     <input class="input" id="p" name="password" type="password"
-           autocomplete="current-password" required autofocus>
+           autocomplete="current-password" required autofocus placeholder="输入密码以解锁管理权限">
   </div>
 
   <button class="btn primary" id="go" type="submit">
-    <span class="spin"></span><span class="label">登录</span>
+    <span class="spin"></span><span class="label">进入控制台 &rarr;</span>
   </button>
 
   <p class="login-foot">
-    <a href="__PUBLIC_URL__">← 返回博客前台</a>
+    <a href="__PUBLIC_URL__">&larr; 返回博客前台</a>
   </p>
 </form>
 

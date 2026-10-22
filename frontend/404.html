@@ -3,20 +3,73 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>404 · JerryHang 的个人博客</title>
+<title>404 · 未找到页面 · JerryHang</title>
 <style>
-  :root { --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #0b0b0d; color: #f5f5f7; text-align: center; padding: 24px; }
-  .code { font-size: 88px; font-weight: 800; letter-spacing: -.02em; background: linear-gradient(135deg, #0a84ff, #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  p { color: #98989d; font-size: 15px; }
-  a { display: inline-block; margin-top: 10px; padding: 10px 22px; border-radius: 999px; background: #fff; color: #0b0b0d; font-weight: 600; text-decoration: none; font-size: 14px; }
-  a:hover { transform: translateY(-1px); }
+  :root {
+    --font: "Helvetica Neue", Helvetica, "Neue Haas Grotesk", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --accent: #e60000;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0px !important; }
+  body {
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: #09090b;
+    color: #f4f4f5;
+    text-align: center;
+    padding: 32px 24px;
+    letter-spacing: -0.01em;
+  }
+  .swiss-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .code {
+    font-size: 96px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: #ffffff;
+  }
+  p {
+    color: #a1a1aa;
+    font-size: 14px;
+    max-width: 320px;
+    line-height: 1.6;
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 14px;
+    padding: 11px 26px;
+    border: 1px solid #ffffff;
+    background: #ffffff;
+    color: #09090b;
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  a:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+  }
 </style>
 </head>
 <body>
+  <span class="swiss-tag">HTTP 404 NOT FOUND</span>
   <div class="code">404</div>
-  <p>页面不存在 —— 可能已被移动或删除。</p>
-  <a href="/">回到首页</a>
+  <p>所请求的页面不存在或已被移除。</p>
+  <a href="/">返回主页 &rarr;</a>
 </body>
 </html>
