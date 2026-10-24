@@ -161,12 +161,12 @@ input { font-family: inherit; }
   transition: color .18s ease;
 }
 #tb-tabs button::after {
-  content: ""; position: absolute; left: 50%; bottom: -1px; transform: translateX(-50%);
-  width: 0; height: 2px; border-radius: 2px; background: var(--accent);
-  transition: width .22s cubic-bezier(.2,.9,.3,1.3);
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; transform: none;
+  width: auto; height: 2px; border-radius: 0; background: transparent;
+  transition: background .15s ease;
 }
 #tb-tabs button.on { color: var(--text); }
-#tb-tabs button.on::after { width: 16px; }
+#tb-tabs button.on::after { background: var(--accent); }
 .top-area.compact #tb-tabs { max-height: 0; opacity: 0; gap: 0; }
 #tb-theme { justify-self: end; }
 #layout { padding-top: calc(84px + env(safe-area-inset-top)); }
@@ -1801,8 +1801,9 @@ body.home-bg::before { display: none !important; }
 #tb-tabs button.on::after {
   content: "" !important;
   position: absolute !important;
-  left: 0 !important; right: 0 !important; bottom: -1px !important;
-  width: 100% !important; height: 2px !important;
+  left: 0 !important; right: 0 !important; bottom: 0 !important;
+  width: auto !important; height: 2px !important;
+  transform: none !important;
   background: var(--accent) !important;
   border-radius: 0px !important;
   display: block !important;
@@ -2367,6 +2368,7 @@ body.dark .top-area #topbar {
   bottom: 0 !important;
   width: auto !important;
   height: 2px !important;
+  transform: none !important;
   background: var(--accent) !important;
   border-radius: 0px !important;
 }
