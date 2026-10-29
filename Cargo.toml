@@ -23,6 +23,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # 跨平台随机数（取代 Linux 专用的 /dev/urandom）
 getrandom = "0.2"
+mimalloc = { version = "0.1", default-features = false }
 
 # ---- 平台专属依赖 ----
 # Linux/Android/Termux：CPU 绑核用 libc

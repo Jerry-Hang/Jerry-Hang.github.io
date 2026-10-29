@@ -8,6 +8,9 @@ mod sha256;
 use std::env;
 use std::path::PathBuf;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if let Some(first) = args.first() {

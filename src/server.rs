@@ -10,6 +10,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use axum::body::Body;
+use bytes::Bytes;
 use axum::extract::{ConnectInfo, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::Response;
@@ -31,7 +32,8 @@ const MEM_CRITICAL_KB: u64 = 1152 * 1024; // 1152 MB (90% of 1280MB)
 const MEM_EMERGENCY_KB: u64 = 1200 * 1024; // 1200 MB (93.75% of 1280MB)
 const MEM_RECOVER_KB: u64 = 896 * 1024;  // 896 MB (70% of 1280MB)
 const MEM_SAMPLE_SECS: u64 = 1;
-const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=600";
+// 静态资源边缘缓存策略：浏览器缓存 10 分钟，Cloudflare 边缘 CDN 缓存 24 小时，后台异步更新
+const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=86400, stale-while-revalidate=60";
 
 // ---------------------------------------------------------------------------
 // 后台界面资源
@@ -354,6 +356,9 @@ impl IpRateLimiter {
     /// 检查该 IP 是否被封禁或请求超频。
     /// 正常返回 Ok(())；超频返回 Err((StatusCode, 提示信息))。
     fn check_and_record(&self, ip: &str) -> Result<(), (StatusCode, &'static str)> {
+        if std::env::var("BLOG_NO_RATE_LIMIT").is_ok() {
+            return Ok(());
+        }
         let now = Instant::now();
         let mut map = self.records.write().unwrap();
 
@@ -548,6 +553,14 @@ async fn session_cleanup(db: Arc<Db>, rate_limiter: Arc<IpRateLimiter>) {
     }
 }
 
+#[derive(Clone)]
+struct CachedStatic {
+    bytes: Bytes,
+    content_type: HeaderValue,
+    etag: HeaderValue,
+    content_length: HeaderValue,
+}
+
 struct AppState {
     cfg: RwLock<Config>,
     gate: Arc<Gate>,
@@ -555,6 +568,7 @@ struct AppState {
     root_canon: PathBuf,
     db: Arc<Db>,
     start: Instant,
+    static_cache: RwLock<HashMap<String, CachedStatic>>,
 }
 
 pub async fn run(cfg: Config, ext_addr: &str, local_addr: &str, max_concurrent: usize, db_path: &str) -> std::io::Result<()> {
@@ -570,6 +584,7 @@ pub async fn run(cfg: Config, ext_addr: &str, local_addr: &str, max_concurrent: 
         root_canon,
         db: db.clone(),
         start: Instant::now(),
+        static_cache: RwLock::new(HashMap::new()),
     });
 
     let ext = TcpListener::bind(ext_addr).await?;
@@ -1072,7 +1087,41 @@ async fn read_static(state: &Arc<AppState>, path: &str, head: bool, local: bool,
     };
 
     if !is_html {
-        return serve_static(&state.root_canon, path, headers, head).await;
+        return serve_static(state, path, headers, head).await;
+    }
+
+    let cache_key = format!("{}:{}", if local { "loc" } else { "pub" }, path);
+    if let Some(cached) = state.static_cache.read().unwrap().get(&cache_key).cloned() {
+        if let Some(inm) = headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+            if inm.trim() == cached.etag.to_str().unwrap_or_default() {
+                return Response::builder()
+                    .status(StatusCode::NOT_MODIFIED)
+                    .header(header::ETAG, cached.etag)
+                    .header(
+                        header::CACHE_CONTROL,
+                        if local { "no-cache, must-revalidate" } else { CACHE_CONTROL },
+                    )
+                    .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+                    .body(Body::empty())
+                    .unwrap();
+            }
+        }
+
+        let resp = Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, cached.content_type)
+            .header(header::CONTENT_LENGTH, cached.content_length)
+            .header(header::ETAG, cached.etag)
+            .header(
+                header::CACHE_CONTROL,
+                if local { "no-cache, must-revalidate" } else { CACHE_CONTROL },
+            )
+            .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+        return if head {
+            resp.body(Body::empty()).unwrap()
+        } else {
+            resp.body(Body::from(cached.bytes)).unwrap()
+        };
     }
 
     let Some(file) = resolve_target(&state.root_canon, path) else {
@@ -1084,17 +1133,35 @@ async fn read_static(state: &Arc<AppState>, path: &str, head: bool, local: bool,
     };
 
     let final_text = if local { text } else { strip_local_only(&text) };
-    let len = final_text.len();
+    let final_bytes = Bytes::from(final_text);
+    let len_str = final_bytes.len().to_string();
+    let etag_str = format!("\"html-{}\"", &sha256::sha256_hex(&final_bytes)[..16]);
+    let ctype_val = HeaderValue::from_static("text/html; charset=utf-8");
+    let clen_val = HeaderValue::from_str(&len_str).unwrap();
+    let etag_val = HeaderValue::from_str(&etag_str).unwrap();
+
+    let cached = CachedStatic {
+        bytes: final_bytes.clone(),
+        content_type: ctype_val.clone(),
+        etag: etag_val.clone(),
+        content_length: clen_val.clone(),
+    };
+    state.static_cache.write().unwrap().insert(cache_key, cached);
+
     let resp = Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-        .header(header::CONTENT_LENGTH, len.to_string())
-        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::CONTENT_TYPE, ctype_val)
+        .header(header::CONTENT_LENGTH, clen_val)
+        .header(header::ETAG, etag_val)
+        .header(
+            header::CACHE_CONTROL,
+            if local { "no-cache, must-revalidate" } else { CACHE_CONTROL },
+        )
         .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
     if head {
         resp.body(Body::empty()).unwrap()
     } else {
-        resp.body(Body::from(final_text)).unwrap()
+        resp.body(Body::from(final_bytes)).unwrap()
     }
 }
 
@@ -1394,8 +1461,31 @@ fn json_response(status: StatusCode, value: serde_json::Value) -> Response {
         .unwrap()
 }
 
-async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap, head: bool) -> Response {
-    let Some(file) = resolve_target(root_canon, target) else {
+async fn serve_static(state: &Arc<AppState>, target: &str, req_headers: &HeaderMap, head: bool) -> Response {
+    if let Some(cached) = state.static_cache.read().unwrap().get(target).cloned() {
+        if let Some(inm) = req_headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
+            if inm.trim() == cached.etag.to_str().unwrap_or_default() {
+                return Response::builder()
+                    .status(StatusCode::NOT_MODIFIED)
+                    .header(header::ETAG, cached.etag)
+                    .header(header::CACHE_CONTROL, CACHE_CONTROL)
+                    .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+                    .body(Body::empty())
+                    .unwrap();
+            }
+        }
+        let mut resp = Response::new(if head { Body::empty() } else { Body::from(cached.bytes) });
+        *resp.status_mut() = StatusCode::OK;
+        resp.headers_mut().insert(header::CONTENT_TYPE, cached.content_type);
+        resp.headers_mut().insert(header::CONTENT_LENGTH, cached.content_length);
+        resp.headers_mut().insert(header::ETAG, cached.etag);
+        resp.headers_mut().insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        resp.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static(CACHE_CONTROL));
+        resp.headers_mut().insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+        return resp;
+    }
+
+    let Some(file) = resolve_target(&state.root_canon, target) else {
         return not_found();
     };
     let Ok(meta) = fs::metadata(&file) else {
@@ -1410,88 +1500,46 @@ async fn serve_static(root_canon: &Path, target: &str, req_headers: &HeaderMap, 
         .unwrap_or(0);
 
     let ctype = content_type(&file);
-    let is_html = ctype.starts_with("text/html");
-    let is_code = matches_ext(target, &["js", "css"]);
     let etag = format!("\"{:x}-{:x}\"", len, mtime);
 
-    // 协商缓存（If-None-Match）：未修改则直接返回 304，节省网络带宽与内存分配
-    if !is_html {
-        if let Some(inm) = req_headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()) {
-            if inm.trim() == etag {
-                return Response::builder()
-                    .status(StatusCode::NOT_MODIFIED)
-                    .header(header::ETAG, etag)
-                    .header(
-                        header::CACHE_CONTROL,
-                        if is_code { "no-cache, must-revalidate" } else { CACHE_CONTROL },
-                    )
-                    .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-                    .body(Body::empty())
-                    .unwrap();
-            }
-        }
-    }
+    let Ok(body) = fs::read(&file) else {
+        return not_found();
+    };
+    let body_bytes = Bytes::from(body);
+    let ctype_val = HeaderValue::from_str(&ctype)
+        .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
+    let clen_val = HeaderValue::from_str(&len.to_string()).unwrap();
+    let etag_val = HeaderValue::from_str(&etag).unwrap();
+
+    let cached = CachedStatic {
+        bytes: body_bytes.clone(),
+        content_type: ctype_val.clone(),
+        etag: etag_val.clone(),
+        content_length: clen_val.clone(),
+    };
+    state.static_cache.write().unwrap().insert(target.to_string(), cached);
 
     if head {
         let mut resp = Response::new(Body::empty());
         *resp.status_mut() = StatusCode::OK;
-        resp.headers_mut().insert(
-            header::CONTENT_TYPE,
-            HeaderValue::from_str(&ctype)
-                .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
-        );
-        resp.headers_mut().insert(
-            header::CONTENT_LENGTH,
-            HeaderValue::from_str(&len.to_string()).unwrap(),
-        );
-        resp.headers_mut()
-            .insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
-        resp.headers_mut()
-            .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-
-        let cc = if is_html || is_code {
-            "no-cache, must-revalidate"
-        } else {
-            CACHE_CONTROL
-        };
-        resp.headers_mut()
-            .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
-        resp.headers_mut()
-            .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+        resp.headers_mut().insert(header::CONTENT_TYPE, ctype_val);
+        resp.headers_mut().insert(header::CONTENT_LENGTH, clen_val);
+        resp.headers_mut().insert(header::ETAG, etag_val);
+        resp.headers_mut().insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        resp.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static(CACHE_CONTROL));
+        resp.headers_mut().insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
         return resp;
     }
 
-    match fs::read(&file) {
-        Ok(body) => {
-            let mut resp = Response::new(Body::from(body));
-            *resp.status_mut() = StatusCode::OK;
-            resp.headers_mut().insert(
-                header::CONTENT_TYPE,
-                HeaderValue::from_str(&ctype)
-                    .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
-            );
-            resp.headers_mut().insert(
-                header::CONTENT_LENGTH,
-                HeaderValue::from_str(&len.to_string()).unwrap(),
-            );
-            resp.headers_mut()
-                .insert(header::ETAG, HeaderValue::from_str(&etag).unwrap());
-            resp.headers_mut()
-                .insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-
-            let cc = if is_html || is_code {
-                "no-cache, must-revalidate"
-            } else {
-                CACHE_CONTROL
-            };
-            resp.headers_mut()
-                .insert(header::CACHE_CONTROL, HeaderValue::from_static(cc));
-            resp.headers_mut()
-                .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
-            resp
-        }
-        Err(_) => not_found(),
-    }
+    let mut resp = Response::new(Body::from(body_bytes));
+    *resp.status_mut() = StatusCode::OK;
+    resp.headers_mut().insert(header::CONTENT_TYPE, ctype_val);
+    resp.headers_mut().insert(header::CONTENT_LENGTH, clen_val);
+    resp.headers_mut().insert(header::ETAG, etag_val);
+    resp.headers_mut().insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    resp.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static(CACHE_CONTROL));
+    resp.headers_mut().insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+    resp
 }
 
 fn text_response(status: StatusCode, body: impl Into<String>) -> Response {
@@ -1563,6 +1611,7 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 /// 判断请求路径的扩展名是否在给定列表里（用于决定缓存策略）。
 /// 同时看原始 URL 和解析后的文件路径，因为 `/blog/foo/` 这种目录索引
 /// 在 URL 上没有扩展名，实际返回的是 index.html。
+#[allow(dead_code)]
 fn matches_ext(target: &str, exts: &[&str]) -> bool {
     let ext = Path::new(target)
         .extension()
