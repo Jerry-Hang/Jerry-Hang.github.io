@@ -25,11 +25,11 @@ pub const DEFAULT_USERNAME: &str = "admin";
 pub const DEFAULT_PASSWORD: &str = "change-me-on-first-login";
 // 内存熔断阈值（RSS，单位 KB）：超过 MEM_THROTTLE_KB 触发限流（并发减半），
 // 超过 MEM_CRITICAL_KB 降至 10%，超过 MEM_EMERGENCY_KB 紧急熔断（拒收新连接防 OOM），
-// 回落到 MEM_RECOVER_KB 以下恢复。系统级硬上限由 systemd MemoryMax=512M 兜底。
-const MEM_THROTTLE_KB: u64 = 384 * 1024; // 384 MB (75% of 512MB)
-const MEM_CRITICAL_KB: u64 = 448 * 1024; // 448 MB (87.5% of 512MB)
-const MEM_EMERGENCY_KB: u64 = 480 * 1024; // 480 MB (93.75% of 512MB)
-const MEM_RECOVER_KB: u64 = 256 * 1024;  // 256 MB (50% of 512MB)
+// 回落到 MEM_RECOVER_KB 以下恢复。系统级硬上限由 systemd MemoryMax=1280M 兜底。
+const MEM_THROTTLE_KB: u64 = 1000 * 1024; // 1000 MB (约 78% of 1280MB)
+const MEM_CRITICAL_KB: u64 = 1152 * 1024; // 1152 MB (90% of 1280MB)
+const MEM_EMERGENCY_KB: u64 = 1200 * 1024; // 1200 MB (93.75% of 1280MB)
+const MEM_RECOVER_KB: u64 = 896 * 1024;  // 896 MB (70% of 1280MB)
 const MEM_SAMPLE_SECS: u64 = 1;
 const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=600";
 
@@ -1891,9 +1891,9 @@ mod tests {
         assert!(MEM_RECOVER_KB < MEM_THROTTLE_KB);
         assert!(MEM_THROTTLE_KB < MEM_CRITICAL_KB);
         assert!(MEM_CRITICAL_KB < MEM_EMERGENCY_KB);
-        assert_eq!(MEM_RECOVER_KB, 256 * 1024);
-        assert_eq!(MEM_THROTTLE_KB, 384 * 1024);
-        assert_eq!(MEM_EMERGENCY_KB, 480 * 1024);
+        assert_eq!(MEM_RECOVER_KB, 896 * 1024);
+        assert_eq!(MEM_THROTTLE_KB, 1000 * 1024);
+        assert_eq!(MEM_EMERGENCY_KB, 1200 * 1024);
     }
 
     #[test]

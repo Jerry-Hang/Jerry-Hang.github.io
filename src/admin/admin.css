@@ -31,17 +31,17 @@
   --orange-soft: rgba(245, 158, 11, .10);
   --red-soft:    rgba(230, 0, 0, .10);
 
-  /* 实体材质背景与文字 */
-  --bg:          #f5f5f7;
-  --bg-elevated: #ffffff;
-  --fg:          #09090b;
-  --fg-2:        #52525b;
-  --fg-3:        #a1a1aa;
-  --border:      #e4e4e7;
+  /* 实体材质背景与文字（瑞士国际风格标准米白纸质感） */
+  --bg:            #f7f6f2;
+  --bg-elevated:   #ffffff;
+  --fg:            #141413;
+  --fg-2:          #5a5854;
+  --fg-3:          #96948e;
+  --border:        #eae7e1;
   --border-strong: #18181b;
-  --sep:         #e4e4e7;
-  --fill:        #f4f4f5;
-  --fill-2:      #ebebef;
+  --sep:           #eae7e1;
+  --fill:          #eeeae3;
+  --fill-2:        #e2ded6;
 
   --radius-s: 0px;
   --radius-m: 0px;

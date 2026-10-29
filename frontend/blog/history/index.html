@@ -19,19 +19,19 @@
   --accent: #e60000; /* 纯粹瑞士红 (Swiss Vermilion Red) */
   --accent-soft: rgba(230, 0, 0, 0.08);
 
-  --bg: #f5f5f7;
+  --bg: #f7f6f2; /* 瑞士现代平面设计标准米白纸质感 (Swiss Rice White / Matte Paper) */
   --surface: #ffffff;
   --card: #ffffff;
-  --card-border: #e4e4e7;
-  --border: #e4e4e7;
+  --card-border: #eae7e1;
+  --border: #eae7e1;
   --border-strong: #18181b;
-  --text: #09090b;
-  --text-soft: #52525b;
-  --text-faint: #a1a1aa;
+  --text: #141413;
+  --text-soft: #5a5854;
+  --text-faint: #96948e;
 
-  --bar-bg: #ffffff;
-  --pill-bg: #f4f4f5;
-  --pill-hover: #e4e4e7;
+  --bar-bg: #f7f6f2;
+  --pill-bg: #eeeae3;
+  --pill-hover: #e2ded6;
 
   --shadow-s: 0 1px 3px rgba(0,0,0,.04);
   --shadow-m: 0 4px 12px rgba(0,0,0,.06);
@@ -799,7 +799,7 @@ body.dark {
   background-image: none !important;
 }
 body:not(.dark) {
-  background: #f5f5f7 !important;
+  background: #f7f6f2 !important;
   background-image: none !important;
 }
 body.wall-clean {
@@ -1019,7 +1019,7 @@ body.wall-clean {
 <style id="aurora-frost">
 :root{--font:"Helvetica Neue",Helvetica,"Neue Haas Grotesk",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
 /* 瑞士国际平面风格：纯色平整背景，彻底废除多色极光与毛玻璃模糊 */
-body{position:relative;background:#f5f5f7 !important;background-image:none !important;color:var(--text) !important;font-family:var(--font) !important;}
+body{position:relative;background:#f7f6f2 !important;background-image:none !important;color:var(--text) !important;font-family:var(--font) !important;}
 body::before{display:none !important;}
 .pill{backdrop-filter:none !important;-webkit-backdrop-filter:none !important;background:var(--card) !important;border:1px solid var(--border) !important;border-radius:0px !important;box-shadow:var(--shadow-s) !important;position:relative !important;overflow:hidden !important;transition:border-color .15s ease,background .15s ease !important;}
 .pill::before,.pill::after{display:none !important;}
@@ -2240,8 +2240,8 @@ body.has-wall #wall-shade {
 
 body:not(.dark) .top-area,
 body:not(.dark) .top-area.compact {
-  background: #ffffff !important;
-  border-bottom-color: #e4e4e7 !important;
+  background: #f7f6f2 !important;
+  border-bottom-color: #eae7e1 !important;
 }
 body:not(.dark) #topbar,
 body:not(.dark) .top-area #topbar {
