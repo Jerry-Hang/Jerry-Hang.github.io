@@ -26,11 +26,11 @@ pub const DEFAULT_USERNAME: &str = "admin";
 pub const DEFAULT_PASSWORD: &str = "change-me-on-first-login";
 // 内存熔断阈值（RSS，单位 KB）：超过 MEM_THROTTLE_KB 触发限流（并发减半），
 // 超过 MEM_CRITICAL_KB 降至 10%，超过 MEM_EMERGENCY_KB 紧急熔断（拒收新连接防 OOM），
-// 回落到 MEM_RECOVER_KB 以下恢复。系统级硬上限由 systemd MemoryMax=1280M 兜底。
-const MEM_THROTTLE_KB: u64 = 1000 * 1024; // 1000 MB (约 78% of 1280MB)
-const MEM_CRITICAL_KB: u64 = 1152 * 1024; // 1152 MB (90% of 1280MB)
-const MEM_EMERGENCY_KB: u64 = 1200 * 1024; // 1200 MB (93.75% of 1280MB)
-const MEM_RECOVER_KB: u64 = 896 * 1024;  // 896 MB (70% of 1280MB)
+// 回落到 MEM_RECOVER_KB 以下恢复。系统级硬上限由 systemd MemoryMax=448M 兜底。
+const MEM_THROTTLE_KB: u64 = 400 * 1024; // 400 MB 降级分界线 (约 89.3% of 448MB)
+const MEM_CRITICAL_KB: u64 = 420 * 1024; // 420 MB 严重限流 (约 93.7% of 448MB)
+const MEM_EMERGENCY_KB: u64 = 435 * 1024; // 435 MB 紧急熔断 (约 97.1% of 448MB，坚决防 448MB 内核 OOM)
+const MEM_RECOVER_KB: u64 = 360 * 1024;  // 360 MB 恢复线 (约 80.4% of 448MB)
 const MEM_SAMPLE_SECS: u64 = 1;
 // 静态资源边缘缓存策略：浏览器缓存 10 分钟，Cloudflare 边缘 CDN 缓存 24 小时，后台异步更新
 const CACHE_CONTROL: &str = "public, max-age=600, s-maxage=86400, stale-while-revalidate=60";
@@ -322,10 +322,10 @@ async fn memory_monitor(gate: Arc<Gate>, base: usize) {
             }
         }
         let limit = match throttle_level {
-            3 => 0,                  // 紧急熔断（>= 480MB）：拒收新连接，防止触发内核 512MB OOM
-            2 => (base / 10).max(4), // 重度限流（>= 448MB）：并发压至 10%
-            1 => (base / 2).max(1),  // 一级限流（>= 384MB）：并发减半
-            _ => base.max(1),        // 恢复正常（<= 256MB）：100% 满负荷
+            3 => 0,                  // 紧急熔断（>= 435MB）：拒收新连接，防止触发内核 448MB OOM
+            2 => (base / 10).max(4), // 重度限流（>= 420MB）：并发压至 10%
+            1 => (base / 2).max(1),  // 一级限流（>= 400MB 降级分界线）：并发减半
+            _ => base.max(1),        // 恢复正常（<= 360MB）：100% 满负荷
         };
         gate.effective.store(limit, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_secs(MEM_SAMPLE_SECS)).await;
@@ -1940,9 +1940,9 @@ mod tests {
         assert!(MEM_RECOVER_KB < MEM_THROTTLE_KB);
         assert!(MEM_THROTTLE_KB < MEM_CRITICAL_KB);
         assert!(MEM_CRITICAL_KB < MEM_EMERGENCY_KB);
-        assert_eq!(MEM_RECOVER_KB, 896 * 1024);
-        assert_eq!(MEM_THROTTLE_KB, 1000 * 1024);
-        assert_eq!(MEM_EMERGENCY_KB, 1200 * 1024);
+        assert_eq!(MEM_RECOVER_KB, 360 * 1024);
+        assert_eq!(MEM_THROTTLE_KB, 400 * 1024);
+        assert_eq!(MEM_EMERGENCY_KB, 435 * 1024);
     }
 
     #[test]

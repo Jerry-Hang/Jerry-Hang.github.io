@@ -299,24 +299,24 @@
       setVal($('k-likes'), d.total_likes ?? 0);
       setVal($('k-devs'), d.trusted_devices ?? 0);
 
-      // CGroup 内存熔断阻尼监控（硬限 1280MB，节流点 1000MB，恢复点 896MB）
+      // CGroup 内存熔断阻尼监控（硬限 448MB，节流点 400MB，恢复点 360MB）
       const rssMb = (rssKb / 1024).toFixed(1);
-      setVal($('mem-cur'), rssMb + ' MB / 1280 MB');
-      const memPct = Math.min(100, Math.max(4, (rssKb / (1280 * 1024)) * 100));
+      setVal($('mem-cur'), rssMb + ' MB / 448 MB');
+      const memPct = Math.min(100, Math.max(4, (rssKb / (448 * 1024)) * 100));
       const memBar = $('mem-bar');
       const memStatus = $('k-mem-status');
       if (memBar) {
         memBar.style.width = memPct + '%';
-        if (rssKb >= 1000 * 1024) {
+        if (rssKb >= 400 * 1024) {
           memBar.style.background = 'var(--red, #ff3b30)';
           if (memStatus) {
-            memStatus.textContent = '阻尼节流中（已超 1000MB）';
+            memStatus.textContent = '阻尼节流中（已超 400MB 降级线）';
             memStatus.style.color = 'var(--red, #ff3b30)';
           }
-        } else if (rssKb >= 896 * 1024) {
+        } else if (rssKb >= 360 * 1024) {
           memBar.style.background = 'var(--orange, #ff9500)';
           if (memStatus) {
-            memStatus.textContent = '平稳监控（高于 896MB 恢复线）';
+            memStatus.textContent = '平稳监控（高于 360MB 恢复线）';
             memStatus.style.color = 'var(--orange, #ff9500)';
           }
         } else {
